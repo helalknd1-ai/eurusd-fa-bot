@@ -221,7 +221,7 @@ def score_sentiment(text):
     return bull, bear
 
 def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل روزانه", breaking_news=None):
-        import re
+    import re
     now_utc=datetime.now(timezone.utc)
     teh=now_utc+timedelta(hours=3,minutes=30)
     if HAS_JALALI:
