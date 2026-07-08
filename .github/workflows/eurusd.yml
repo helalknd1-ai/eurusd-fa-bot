@@ -28,9 +28,9 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SEND_VOICE: "true"
-          VOICE_NAME: "fa-IR-DilaraNeural"
-          VOICE_RATE: "-5%"
-          VOICE_PITCH: "+2Hz"
+          VOICE_NAME: "fa-IR-FaridNeural"
+          VOICE_RATE: "-8%"
+          VOICE_PITCH: "+0Hz"
           NEWS_IMPACT: "High,Medium"
           TZ: "Asia/Tehran"
         run: |
