@@ -1,0 +1,37 @@
+name: EURUSD FA Persian – Telegram
+
+on:
+  schedule:
+    - cron: '30 4 * * 1-5'
+    - cron: '40 4 * * 1-5'
+    - cron: '30 12 * * 1-5'
+    - cron: '30 14 * * 1-5'
+    - cron: '0,15,30,45 6-20 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install deps
+        run: |
+          pip install -r requirements.txt
+          pip install edge-tts gtts feedparser beautifulsoup4 python-dotenv pytz jdatetime lxml
+      - name: Run EURUSD
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SEND_VOICE: "true"
+          VOICE_NAME: "fa-IR-DilaraNeural"
+          VOICE_RATE: "-5%"
+          VOICE_PITCH: "+2Hz"
+          NEWS_IMPACT: "High,Medium"
+          TZ: "Asia/Tehran"
+        run: |
+          python eurusd_telegram.py --slot morning
