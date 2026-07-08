@@ -24,6 +24,62 @@ try:
     HAS_JALALI = True
 except:
     HAS_JALALI = False
+   
+# ---------- AI (Groq) ----------
+try:
+    from groq import Groq
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+    HAS_GROQ = bool(GROQ_API_KEY)
+    if HAS_GROQ:
+        groq_client = Groq(api_key=GROQ_API_KEY)
+except Exception as e:
+    HAS_GROQ = False
+    print("Groq not available:", e)
+
+
+def ai_analyze(news_text, calendar_events, bull_score, bear_score):
+    """تحلیل هوشمند با Groq AI"""
+    if not HAS_GROQ:
+        return None
+    try:
+        cal_summary = ""
+        if calendar_events:
+            for ev in calendar_events[:5]:
+                cal_summary += f"- {ev.get('country','')}: {ev.get('title','')} (پیش‌بینی: {ev.get('forecast','N/A')})\n"
+
+        prompt = f"""تو یک تحلیل‌گر حرفه‌ای فاندامنتال بازار فارکس هستی، متخصص جفت‌ارز EUR/USD.
+
+بر اساس اخبار و داده‌های زیر، یک تحلیل کوتاه (حداکثر 300 کلمه) به زبان فارسی روان و حرفه‌ای بنویس:
+
+📰 اخبار امروز از Bloomberg، FXStreet، ECB، Fed:
+{news_text[:3500]}
+
+📅 تقویم اقتصادی:
+{cal_summary if cal_summary else "رویداد مهمی ثبت نشده"}
+
+📊 امتیاز احساسات: صعودی={bull_score} | نزولی={bear_score}
+
+لطفاً تحلیلت شامل این بخش‌ها باشه:
+1. 🎯 جهت کلی بازار (صعودی/نزولی/خنثی) با دلیل
+2. 🏦 وضعیت بانک‌های مرکزی (ECB و Fed)
+3. ⚠️ ریسک‌های مهم امروز
+4. 💡 توصیه کلی برای معامله‌گران (بدون قیمت دقیق)
+
+فقط تحلیل فارسی بنویس، بدون مقدمه و بدون توضیح اضافه."""
+
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "تو یک تحلیل‌گر خبره بازار فارکس هستی که به فارسی روان تحلیل می‌نویسی."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=800,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as ex:
+        print("AI analyze error:", ex)
+        return None 
 
 # ---------- CONFIG ----------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "PUT_YOURS")
@@ -418,14 +474,24 @@ def send_telegram_voice(text_fa):
 
 def run_once(slot="manual"):
     print(f"[{slot}] Fetching news ...")
-    news=fetch_news_all()
-    cal=get_today_events()
+    news = fetch_news_all()
+    cal = get_today_events()
     bull, bear = score_sentiment(news)
     slot_label = SCHEDULES.get(slot, {}).get("label", slot)
+
+    # 🤖 تحلیل با هوش مصنوعی Groq
+    ai_analysis = ai_analyze(news, cal, bull, bear)
+
     text_msg, voice_msg = build_brief(news, bull, bear, cal, slot_label=slot_label)
+
+    # اگر AI جواب داد، به پیام اضافه کن
+    if ai_analysis:
+        text_msg = f"🤖 **تحلیل هوش مصنوعی (Groq AI):**\n\n{ai_analysis}\n\n━━━━━━━━━━━━━━━\n\n{text_msg}"
+        # ویس هم از تحلیل AI استفاده کنه (بهتر و طبیعی‌تر)
+        voice_msg = ai_analysis[:1500]
+
     send_telegram_text(text_msg)
     send_telegram_voice(voice_msg)
-
 def watch_news_loop():
     """واچر زنده – هر 60 ثانیه چک می‌کند، اگر خبر High Impact جدید منتشر شد بلافاصله تحلیل می‌فرستد"""
     print("Live news watcher started – interval", WATCH_INTERVAL_SECONDS, "sec – Ctrl+C to stop")
