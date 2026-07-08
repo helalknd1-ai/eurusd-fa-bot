@@ -521,7 +521,6 @@ def send_telegram_voice(text_fa):
         except: pass
 
 def run_once(slot="manual"):
-def run_once(slot="manual"):
     print(f"[{slot}] Fetching news ...")
     news = fetch_news_all()
     cal = get_today_events()
