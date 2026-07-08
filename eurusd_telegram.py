@@ -93,11 +93,14 @@ VOICE_STYLE = os.getenv("VOICE_STYLE", "chat")
 NEWS_IMPACT_LEVELS = os.getenv("NEWS_IMPACT", "High,Medium").split(",")  # زنانه – مایکروسافت Edge
 VOICE_FALLBACK_LANG = "fa"  # gTTS fallback
 # زمان‌های تهران
+
 SCHEDULES = {
-    "morning": {"hour": 7, "minute": 30, "label": "صبح – تحلیل باز شدن اروپا"},
-    "news_morning": {"hour": 7, "minute": 40, "label": "صبح – خبر ۷:۴۰"},
-    "us_preopen": {"hour": 16, "minute": 0, "label": "یک ساعت قبل بازار آمریکا"},
-    "evening": {"hour": 18, "minute": 0, "label": "عصر – جمع‌بندی"},
+    "morning": {"hour": 7, "minute": 30, "label": "🌅 صبح – تحلیل باز شدن اروپا"},
+    "news_morning": {"hour": 7, "minute": 40, "label": "☕ صبح – آپدیت خبری"},
+    "us_preopen": {"hour": 16, "minute": 0, "label": "🌆 قبل بازار آمریکا"},
+    "evening": {"hour": 18, "minute": 0, "label": "🌙 عصر – جمع‌بندی روز"},
+    "watch": {"hour": 0, "minute": 0, "label": "🔔 رصد اخبار فوری"},
+    "manual": {"hour": 0, "minute": 0, "label": "🔧 اجرای دستی"},
 }
 # واچ خبر زنده
 WATCH_INTERVAL_SECONDS = int(os.getenv("WATCH_INTERVAL", "60"))
@@ -417,13 +420,58 @@ def send_telegram_text(text):
         print("=== DRY RUN TEXT ===")
         print(text[:2000])
         return True
-    url=f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    # تلگرام حد 4096 کاراکتر
-    if len(text) > 4000:
-        text = text[:4000] + "\n…"
-    r=requests.post(url, data={"chat_id":CHAT_ID,"text":text,"parse_mode":"Markdown","disable_web_page_preview":True}, timeout=20)
-    print("Telegram text:", r.status_code)
-    return r.ok
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+
+    # اگه پیام طولانی‌تر از 4000 کاراکتره، به چند بخش تقسیم کن
+    max_len = 4000
+    if len(text) <= max_len:
+        chunks = [text]
+    else:
+        chunks = []
+        while text:
+            chunk = text[:max_len]
+            # سعی کن آخرین خط کامل رو جدا کنی
+            last_newline = chunk.rfind('\n')
+            if last_newline > max_len // 2:
+                chunk = chunk[:last_newline]
+            chunks.append(chunk)
+            text = text[len(chunk):].lstrip()
+
+    all_ok = True
+    for i, chunk in enumerate(chunks):
+        try:
+            r = requests.post(
+                url,
+                data={
+                    "chat_id": CHAT_ID,
+                    "text": chunk,
+                    "parse_mode": "Markdown",
+                    "disable_web_page_preview": True
+                },
+                timeout=20
+            )
+            print(f"Telegram text part {i+1}/{len(chunks)}:", r.status_code)
+            if not r.ok:
+                all_ok = False
+                # اگه Markdown مشکل داشت، بدون parse_mode بفرست
+                r2 = requests.post(
+                    url,
+                    data={
+                        "chat_id": CHAT_ID,
+                        "text": chunk,
+                        "disable_web_page_preview": True
+                    },
+                    timeout=20
+                )
+                print(f"Retry without markdown: {r2.status_code}")
+                if r2.ok:
+                    all_ok = True
+        except Exception as ex:
+            print(f"Send error: {ex}")
+            all_ok = False
+
+    return all_ok
 
 def send_telegram_voice(text_fa):
     if not SEND_VOICE:
@@ -473,25 +521,90 @@ def send_telegram_voice(text_fa):
         except: pass
 
 def run_once(slot="manual"):
+def run_once(slot="manual"):
     print(f"[{slot}] Fetching news ...")
     news = fetch_news_all()
     cal = get_today_events()
     bull, bear = score_sentiment(news)
     slot_label = SCHEDULES.get(slot, {}).get("label", slot)
 
+    # 🔔 حالت watch: فقط اگه خبر High Impact جدید باشه پیام بده
+    if slot == "watch":
+        hits = check_live_news()
+        if not hits:
+            print("[watch] No new high-impact events. Skipping.")
+            return
+        print(f"[watch] {len(hits)} new event(s) found")
+
     # 🤖 تحلیل با هوش مصنوعی Groq
     ai_analysis = ai_analyze(news, cal, bull, bear)
 
-    text_msg, voice_msg = build_brief(news, bull, bear, cal, slot_label=slot_label)
+    # 📊 محاسبه جهت بازار
+    diff = bull - bear
+    if diff >= 3:
+        direction_emoji = "🟢"
+        direction = "صعودی"
+    elif diff <= -3:
+        direction_emoji = "🔴"
+        direction = "نزولی"
+    elif diff >= 1:
+        direction_emoji = "🟡🟢"
+        direction = "خنثی متمایل به صعود"
+    elif diff <= -1:
+        direction_emoji = "🟡🔴"
+        direction = "خنثی متمایل به نزول"
+    else:
+        direction_emoji = "⚪️"
+        direction = "خنثی / رنج"
 
-    # اگر AI جواب داد، به پیام اضافه کن
+    # 📅 زمان تهران
+    now_teh = datetime.now(timezone.utc) + timedelta(hours=3, minutes=30)
+    if HAS_JALALI:
+        jd = jdatetime.datetime.fromgregorian(datetime=now_teh)
+        date_fa = jd.strftime("%A %d %B %Y – %H:%M")
+    else:
+        date_fa = now_teh.strftime("%Y-%m-%d %H:%M")
+
+    # 🎨 ساخت پیام حرفه‌ای
     if ai_analysis:
-        text_msg = f"🤖 **تحلیل هوش مصنوعی (Groq AI):**\n\n{ai_analysis}\n\n━━━━━━━━━━━━━━━\n\n{text_msg}"
-        # ویس هم از تحلیل AI استفاده کنه (بهتر و طبیعی‌تر)
-        voice_msg = ai_analysis[:1500]
+        text_msg = f"""{direction_emoji} **EUR/USD | {slot_label}**
+📅 {date_fa} (تهران)
 
-    send_telegram_text(text_msg)
-    send_telegram_voice(voice_msg)
+━━━━━━━━━━━━━━━━━━━━
+
+🤖 **تحلیل هوش مصنوعی:**
+
+{ai_analysis}
+
+━━━━━━━━━━━━━━━━━━━━
+
+📊 **خلاصه احساسات بازار:**
+• جهت: {direction}
+• امتیاز صعودی: {bull} | امتیاز نزولی: {bear}
+• رویدادهای مهم امروز: {len(cal) if cal else 0}
+
+━━━━━━━━━━━━━━━━━━━━
+
+⚠️ *این تحلیل صرفاً جنبه اطلاع‌رسانی دارد و توصیه معاملاتی نیست.*
+
+@EURUSD_Fa_Bot"""
+        # ویس از تحلیل AI ساخته میشه
+        voice_msg = f"تحلیل یورو دلار، {slot_label}.\n\n{ai_analysis[:1200]}"
+    else:
+        # اگه AI کار نکرد، به روش قدیمی برو
+        text_msg, voice_msg = build_brief(news, bull, bear, cal, slot_label=slot_label)
+
+    # 📤 ارسال به تلگرام
+    if send_telegram_text(text_msg):
+        print("✅ Text sent successfully")
+    else:
+        print("❌ Text send failed")
+
+    if SEND_VOICE:
+        if send_telegram_voice(voice_msg):
+            print("✅ Voice sent successfully")
+        else:
+            print("❌ Voice send failed")
 def watch_news_loop():
     """واچر زنده – هر 60 ثانیه چک می‌کند، اگر خبر High Impact جدید منتشر شد بلافاصله تحلیل می‌فرستد"""
     print("Live news watcher started – interval", WATCH_INTERVAL_SECONDS, "sec – Ctrl+C to stop")
@@ -533,7 +646,7 @@ def watch_news_loop():
 if __name__=="__main__":
     import argparse
     parser=argparse.ArgumentParser(description="EUR/USD FA Persian Telegram Bot v3")
-    parser.add_argument("--slot", choices=["morning","news_morning","us_preopen","evening","manual"], default="manual")
+    parser.add_argument("--slot", choices=["morning","news_morning","us_preopen","evening","manual","watch"], default="manual")
     parser.add_argument("--watch", action="store_true", help="اجرای واچر خبر زنده – بعد از هر داده High Impact بلافاصله تحلیل می‌فرستد")
     parser.add_argument("--once", action="store_true", help="فقط یک بار اجرا")
     args=parser.parse_args()
