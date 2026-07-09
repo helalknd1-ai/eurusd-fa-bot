@@ -656,112 +656,133 @@ def build_timeframe_view(bull, bear, calendar_events=None, breaking_news=None):
 """
 
 def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل روزانه", breaking_news=None):
-    import re
-    now_utc=datetime.now(timezone.utc)
-    teh=now_utc+timedelta(hours=3,minutes=30)
+    now_utc = datetime.now(timezone.utc)
+    teh = now_utc + timedelta(hours=3, minutes=30)
+
     if HAS_JALALI:
-        jd=jdatetime.datetime.fromgregorian(datetime=teh)
-        date_fa=jd.strftime("%A %d %B %Y – %H:%M تهران")
-        date_short=jd.strftime("%d %B")
+        jd = jdatetime.datetime.fromgregorian(datetime=teh)
+        date_fa = jd.strftime("%A %d %B %Y - %H:%M تهران")
+        date_short = jd.strftime("%d %B")
     else:
-        date_fa=teh.strftime("%Y-%m-%d %H:%M")
-        date_short=teh.strftime("%d %b")
+        date_fa = teh.strftime("%Y-%m-%d %H:%M تهران")
+        date_short = teh.strftime("%d %b")
 
-    diff=bull-bear
-    if diff>=3:
-        direction="صعودی"; bias="خرید در اصلاح"; emoji="🟢"; conf="متوسط به بالا"
-    elif diff<=-3:
-        direction="نزولی"; bias="فروش در رشد"; emoji="🔴"; conf="متوسط به بالا"
-    elif diff>=1:
-        direction="خنثی متمایل به صعود ضعیف"; bias="رنج صعودی"; emoji="🟡🟢"; conf="متوسط"
-    elif diff<=-1:
-        direction="خنثی متمایل به نزول ضعیف"; bias="رنج نزولی"; emoji="🟡🔴"; conf="متوسط"
+    diff = int(bull) - int(bear)
+
+    if diff >= 3:
+        direction = "صعودی"
+        bias = "خرید در اصلاح"
+        emoji = "سبز"
+        conf = "متوسط به بالا"
+    elif diff <= -3:
+        direction = "نزولی"
+        bias = "فروش در رشد"
+        emoji = "قرمز"
+        conf = "متوسط به بالا"
+    elif diff >= 1:
+        direction = "خنثی متمایل به صعود"
+        bias = "رنج صعودی"
+        emoji = "زرد"
+        conf = "متوسط"
+    elif diff <= -1:
+        direction = "خنثی متمایل به نزول"
+        bias = "رنج نزولی"
+        emoji = "زرد"
+        conf = "متوسط"
     else:
-        direction="کاملا خنثی / رنج"; bias="انتظار داده"; emoji="⚪️"; conf="پایین"
+        direction = "خنثی / رنج"
+        bias = "انتظار داده"
+        emoji = "خنثی"
+        conf = "پایین"
 
-    # اگر خبر فوری داریم، اول بیار
-    breaking_block=""
+    breaking_block = ""
+
     if breaking_news:
         bn = breaking_news[0] if isinstance(breaking_news, list) else breaking_news
-        breaking_block = f"""
-🚨 **خبر فوری – همین الان منتشر شد**
-• {bn.get('country','')} – {bn.get('title','')}
-واقعی: {bn.get('actual','')} | پیش‌بینی: {bn.get('forecast','')} | قبلی: {bn.get('previous','')}
 
-نظر فوری من: {bn.get('instant_impact') or released_event_impact(bn)}
+        if "released_event_impact" in globals():
+            impact_text = bn.get("instant_impact") or released_event_impact(bn)
+        else:
+            impact_text = bn.get("instant_impact") or "خبر منتشر شده و نیاز به بررسی واکنش بازار دارد."
 
-        # تفسیر ساده اتومات
-        # اگر USD و actual بدتر از forecast → bullish EUR
-        try:
-            # سعی عددی
-            def num(s):
-                m=re.search(r'[-+]?\d*\.?\d+', str(s))
-                return float(m.group()) if m else None
-            a=num(bn.get('actual')); f=num(bn.get('forecast'))
-            if a is not None and f is not None:
-                if bn.get('country')=='USD':
-                    # برای NFP / CPI – ساده شده
-                    # اشتغال کمتر = دلار ضعیف = یورو صعودی
-                    # تورم بیشتر = دلار قوی
-                    is_inflation = any(x in bn.get('title','').lower() for x in ['cpi','inflation','pce'])
-                    if is_inflation:
-                        eur_bullish = a < f
-                    else:
-                        # jobs – بیشتر بهتر برای دلار
-                        eur_bullish = a < f
-                    interpret = "سیگنال صعودی برای یورو – دلار تضعیف شد." if eur_bullish else "سیگنال نزولی برای یورو – دلار تقویت شد."
-                    breaking_block = breaking_block.replace("یورو تقویت می‌شود – فشار نزولی دلار", interpret)
-        except: pass
+        breaking_block = "\n".join([
+            "خبر فوری:",
+            f"{bn.get('country', '')} - {bn.get('title', '')}",
+            f"واقعی: {bn.get('actual', '')} | پیش بینی: {bn.get('forecast', '')} | قبلی: {bn.get('previous', '')}",
+            f"نظر فوری: {impact_text}",
+        ])
 
-    # نکات کلیدی – بدون قیمت
-    sentences=re.split(r'[\.\n•\-]', news_text)
-    keys=[]
-    all_kw=BULLISH+BEARISH+["ecb","fed","lagarde","warsh","bloomberg"]
+    sentences = re.split(r'[\.\n]', news_text or "")
+    keys = []
+    all_kw = BULLISH + BEARISH + ["ecb", "fed", "lagarde", "cpi", "pce", "nfp", "dollar", "euro", "inflation"]
+
     for s in sentences:
-        sl=s.lower().strip()
-        if any(k in sl for k in all_kw) and 40 < len(s) < 200:
-            s2=re.sub(r'\b1\.\d{3,5}\b', 'سطح کلیدی', s)
-            s2=re.sub(r'\$\d+[\.\d]*', 'قیمت', s2)
-            if s2.strip() not in keys:
-                keys.append(s2.strip())
-        if len(keys)>=5: break
+        s_clean = s.strip()
+        s_low = s_clean.lower()
+
+        if any(k in s_low for k in all_kw) and 30 < len(s_clean) < 220:
+            s_clean = re.sub(r'\b1\.\d{3,5}\b', 'سطح قیمتی', s_clean)
+            s_clean = re.sub(r'\$\d+[\.\d]*', 'قیمت', s_clean)
+
+            if s_clean not in keys:
+                keys.append(s_clean)
+
+        if len(keys) >= 4:
+            break
+
     if not keys:
-        keys=[
-            "داده اشتغال آمریکا ضعیف‌تر از انتظار – فشار نزولی دلار",
-            "تورم منطقه یورو سرد شد – بانک مرکزی اروپا در حالت توقف",
-            "بلومبرگ: ریسک انرژی کاهش یافته"
+        keys = [
+            "در منابع خبری فعلی، تیتر قوی و قطعی برای جهت دهی بازار دیده نشد.",
+            "بازار ممکن است تا انتشار داده های مهم بعدی در حالت احتیاط باقی بماند.",
+            "واکنش دلار، یورو و لحن بانک های مرکزی برای ادامه مسیر مهم است."
         ]
-    def fa_map(t):
-        rep={"dovish":"داویش","hawkish":"هاوکیش","fed":"فدرال رزرو","ecb":"بانک مرکزی اروپا","inflation":"تورم","nfp":"اشتغال NFP","dollar":"دلار","euro":"یورو","lagarde":"لاگارد","warsh":"وارش","bloomberg":"بلومبرگ","rate hike":"افزایش نرخ","rate cut":"کاهش نرخ","pause":"توقف","cpi":"CPI","pce":"PCE"}
-        o=t
-        for en,fa in rep.items():
-            o=re.sub(en, fa, o, flags=re.IGNORECASE)
-        return o[:170]
-    bullets="\n".join([f"• {fa_map(k)}" for k in keys[:4]])
 
-    # تقویم
+    bullets = "\n".join([f"- {k[:180]}" for k in keys[:4]])
+
     if calendar_events:
-        cal_lines=[]
-        for ev in calendar_events[:5]:
-            # ev میتونه dict از ForexFactory یا dict ساده خودمان
-            if isinstance(ev, dict) and "title" in ev:
-                tm=ev.get("time", ev.get("date",""))
-                ct=ev.get("country","")
-                ttl=ev.get("title","")
-                fc=ev.get("forecast","")
-                cal_lines.append(f"• {tm} – {ct} – {ttl}" + (f" – پیش‌بینی: {fc}" if fc else ""))
-        calendar_text="\n".join(cal_lines) if cal_lines else "• امروز رویداد High Impact ثبت نشده"
-    else:
-        calendar_text="• امروز رویداد High Impact ثبت نشده – بازار تکنیکال"
-        timeframe_view = build_timeframe_view(bull, bear, calendar_events, breaking_news)
-        currency_strength = build_currency_strength(bull, bear, calendar_events, breaking_news)
+        cal_lines = []
 
-            msg = "\n".join([
+        for ev in calendar_events[:5]:
+            tm = ev.get("time", ev.get("date", ""))
+            ct = ev.get("country", "")
+            ttl = ev.get("title", "")
+            impact = ev.get("impact", "")
+            fc = ev.get("forecast", "")
+
+            line = f"- {tm} | {ct} | {impact} | {ttl}"
+            if fc:
+                line += f" | پیش بینی: {fc}"
+
+            cal_lines.append(line)
+
+        calendar_text = "\n".join(cal_lines) if cal_lines else "امروز رویداد مهمی ثبت نشده است."
+    else:
+        calendar_text = "امروز رویداد High یا Medium مهمی ثبت نشده است."
+
+    try:
+        timeframe_view = build_timeframe_view(bull, bear, calendar_events, breaking_news)
+    except Exception:
+        timeframe_view = "جمع بندی چندزمانه فعلا در دسترس نیست."
+
+    try:
+        currency_strength = build_currency_strength(bull, bear, calendar_events, breaking_news)
+    except Exception:
+        currency_strength = "قدرت نسبی ارزها فعلا در دسترس نیست."
+
+    msg_parts = [
         f"{emoji} تحلیل فاندامنتال EUR/USD - {slot_label}",
         "",
-        str(date_fa),
-        "",
-        str(breaking_block),
+        date_fa,
+        ""
+    ]
+
+    if breaking_block:
+        msg_parts.extend([
+            breaking_block,
+            ""
+        ])
+
+    msg_parts.extend([
         f"جهت فاندامنتال: {direction}",
         f"تمایل: {bias}",
         f"اطمینان: {conf}",
@@ -771,34 +792,36 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
         str(currency_strength),
         "",
         "خلاصه منابع:",
-        str(bullets),
+        bullets,
         "",
         "تقویم اقتصادی امروز/فردا:",
-        str(calendar_text),
+        calendar_text,
         "",
         "بانک های مرکزی:",
-        "- ECB: وضعیت بانک مرکزی اروپا بر اساس خبرهای امروز بررسی می شود.",
-        "- Fed: وضعیت فدرال رزرو بر اساس داده های آمریکا بررسی می شود.",
+        "- ECB: وضعیت بانک مرکزی اروپا بر اساس خبرهای امروز و لحن بازار بررسی می شود.",
+        "- Fed: وضعیت فدرال رزرو بر اساس داده های آمریکا، تورم، اشتغال و لحن اعضا بررسی می شود.",
         "",
-        f"نتیجه: جهت کوتاه مدت {direction} است. مدیریت ریسک ضروری است.",
+        f"نتیجه: جهت کوتاه مدت {direction} است. تا قبل از داده های مهم، مدیریت ریسک ضروری است.",
         "",
         f"@EURUSD_Fa_Bot | {date_short}",
         f"امتیاز خبری: صعودی {bull} / نزولی {bear}"
     ])
-    
-    # ویس کوتاه – زنانه – بدون قیمت
-   voice_text = f"""تحلیل فاندامنتال یورو دلار - {date_short} - {slot_label}.
 
-جهت امروز: {direction}. اطمینان: {conf}.
+    msg = "\n".join(msg_parts)
 
-بانک مرکزی اروپا بر اساس خبرهای امروز بررسی می شود.
-فدرال رزرو بر اساس داده های آمریکا بررسی می شود.
+    voice_parts = [
+        f"تحلیل فاندامنتال یورو دلار، {date_short}، {slot_label}.",
+        f"جهت امروز: {direction}. اطمینان: {conf}.",
+        "بانک مرکزی اروپا بر اساس خبرهای امروز بررسی می شود.",
+        "فدرال رزرو بر اساس داده های آمریکا بررسی می شود.",
+        "بازار ممکن است نوسانی باشد. با مدیریت ریسک معامله کنید."
+    ]
 
-بازار ممکن است نوسانی باشد. با مدیریت ریسک معامله کنید.
-"""
-    # پاکسازی اعداد قیمتی برای ویس هم
+    voice_text = "\n".join(voice_parts)
     voice_text = re.sub(r'\b1\.\d{3,5}\b', '', voice_text)
+
     return msg, voice_text
+                        
 
 def send_telegram_text(text):
     if TELEGRAM_TOKEN.startswith("PUT_"):
