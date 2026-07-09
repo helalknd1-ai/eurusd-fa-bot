@@ -191,6 +191,238 @@ def get_today_events():
             if d in [today, tomorrow]:
                 out.append(ev)
     return out
+    # ---------- MORNING CALENDAR ALERT ----------
+
+TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
+
+
+def impact_to_fa(impact):
+    """تبدیل درجه اهمیت خبر به فارسی"""
+    impact = (impact or "").strip().lower()
+
+    if impact == "high":
+        return "🔴 خیلی مهم"
+    elif impact == "medium":
+        return "🟠 متوسط مهم"
+    elif impact == "low":
+        return "🟢 کم‌اهمیت"
+    else:
+        return "⚪ نامشخص"
+
+
+def parse_event_datetime(event):
+    """تلاش برای خواندن زمان خبر از تقویم"""
+    raw_date = (event.get("date") or "").strip()
+
+    if not raw_date:
+        return None
+
+    try:
+        dt = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
+
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+
+        return dt
+
+    except Exception:
+        return None
+
+
+def event_time_tehran(event):
+    """نمایش ساعت خبر به وقت تهران"""
+    dt = parse_event_datetime(event)
+
+    if dt:
+        teh = dt.astimezone(TEHRAN_TZ)
+        return teh.strftime("%H:%M تهران")
+
+    raw_time = event.get("time", "")
+    if raw_time:
+        return str(raw_time)
+
+    return "زمان نامشخص"
+
+
+def is_event_today_tehran(event):
+    """بررسی اینکه خبر برای امروز تهران است یا نه"""
+    dt = parse_event_datetime(event)
+
+    if not dt:
+        return True
+
+    event_day = dt.astimezone(TEHRAN_TZ).date()
+    today_tehran = datetime.now(TEHRAN_TZ).date()
+
+    return event_day == today_tehran
+
+
+def expected_event_impact(event):
+    """
+    توضیح اثر احتمالی خبر روی EUR/USD قبل از انتشار actual.
+    این تابع برای یادآور صبحگاهی استفاده می‌شود.
+    """
+
+    title = (event.get("title") or "").lower()
+    country = (event.get("country") or "").upper()
+
+    # ---------- USD EVENTS ----------
+
+    if country == "USD" and any(k in title for k in ["cpi", "inflation", "pce"]):
+        return (
+            "اگر عدد تورم بالاتر از پیش‌بینی منتشر شود، احتمال تقویت دلار بیشتر می‌شود و EUR/USD می‌تواند فشار نزولی بگیرد. "
+            "اگر عدد پایین‌تر از پیش‌بینی باشد، دلار می‌تواند تضعیف شود و EUR/USD حمایت بگیرد."
+        )
+
+    if country == "USD" and any(k in title for k in ["nfp", "nonfarm", "non-farm", "payroll", "employment change"]):
+        return (
+            "عدد اشتغال قوی‌تر از پیش‌بینی معمولاً به نفع دلار است و می‌تواند EUR/USD را تحت فشار بگذارد. "
+            "عدد ضعیف‌تر از پیش‌بینی معمولاً به ضرر دلار و به نفع EUR/USD است."
+        )
+
+    if country == "USD" and any(k in title for k in ["unemployment rate", "jobless claims", "initial jobless", "continuing claims"]):
+        return (
+            "عدد بالاتر از پیش‌بینی معمولاً نشانه ضعف بازار کار آمریکا است و می‌تواند دلار را تضعیف کند؛ این حالت برای EUR/USD حمایتی است. "
+            "عدد پایین‌تر از پیش‌بینی معمولاً به نفع دلار است و می‌تواند روی EUR/USD فشار نزولی ایجاد کند."
+        )
+
+    if country == "USD" and any(k in title for k in ["average hourly earnings", "wages", "wage"]):
+        return (
+            "رشد دستمزد بالاتر از پیش‌بینی می‌تواند فشار تورمی را بالا نگه دارد و به نفع دلار باشد. "
+            "رشد دستمزد پایین‌تر از پیش‌بینی می‌تواند انتظارات سیاست انقباضی Fed را کاهش دهد و به ضرر دلار باشد."
+        )
+
+    if country == "USD" and any(k in title for k in ["fomc", "fed", "powell", "rate decision", "interest rate"]):
+        return (
+            "لحن هاوکیش فدرال رزرو معمولاً دلار را تقویت می‌کند و برای EUR/USD نزولی است. "
+            "لحن داویش می‌تواند دلار را تضعیف کند و به EUR/USD کمک کند."
+        )
+
+    if country == "USD" and any(k in title for k in ["retail sales", "gdp", "ism", "pmi", "durable goods", "consumer confidence"]):
+        return (
+            "عدد قوی‌تر از پیش‌بینی معمولاً دلار را تقویت می‌کند و برای EUR/USD فشار نزولی دارد. "
+            "عدد ضعیف‌تر از پیش‌بینی می‌تواند دلار را تضعیف کند و به نفع EUR/USD باشد."
+        )
+
+    # ---------- EUR / EURO AREA EVENTS ----------
+
+    if country in ["EUR", "EMU"] and any(k in title for k in ["cpi", "inflation", "hicp"]):
+        return (
+            "تورم بالاتر از پیش‌بینی می‌تواند احتمال لحن هاوکیش‌تر ECB را بالا ببرد و به نفع یورو باشد. "
+            "تورم پایین‌تر از پیش‌بینی می‌تواند یورو را تضعیف کند و برای EUR/USD منفی باشد."
+        )
+
+    if country in ["EUR", "EMU"] and any(k in title for k in ["ecb", "lagarde", "rate decision", "interest rate"]):
+        return (
+            "لحن هاوکیش ECB معمولاً به نفع یورو و صعود EUR/USD است. "
+            "لحن داویش ECB می‌تواند یورو را تضعیف کند و برای EUR/USD منفی باشد."
+        )
+
+    if country in ["EUR", "EMU"] and any(k in title for k in ["gdp", "pmi", "retail sales", "zew", "ifo", "employment", "unemployment"]):
+        return (
+            "داده قوی‌تر از انتظار معمولاً به نفع یورو است و می‌تواند EUR/USD را حمایت کند. "
+            "داده ضعیف‌تر می‌تواند یورو را تحت فشار بگذارد."
+        )
+
+    return (
+        "این خبر می‌تواند روی احساسات بازار اثر بگذارد. هنگام انتشار باید عدد واقعی با پیش‌بینی مقایسه شود."
+    )
+
+
+def build_morning_calendar_alert(calendar_events):
+    """
+    ساخت پیام صبحگاهی برای خبرهای High و Medium امروز.
+    """
+
+    now_teh = datetime.now(TEHRAN_TZ)
+
+    if HAS_JALALI:
+        jd = jdatetime.datetime.fromgregorian(datetime=now_teh)
+        date_fa = jd.strftime("%A %d %B %Y – %H:%M تهران")
+    else:
+        date_fa = now_teh.strftime("%Y-%m-%d %H:%M تهران")
+
+    allowed_impacts = {x.strip().lower() for x in NEWS_IMPACT_LEVELS}
+
+    events = []
+    for ev in calendar_events:
+        impact = (ev.get("impact") or "").strip().lower()
+
+        if impact not in allowed_impacts:
+            continue
+
+        if not is_event_today_tehran(ev):
+            continue
+
+        events.append(ev)
+
+    if not events:
+        return f"""🌅 یادآور اقتصادی امروز EUR/USD
+
+{date_fa}
+
+امروز برای EUR/USD خبر High یا Medium مهمی در تقویم ثبت نشده است.
+
+با این حال بازار می‌تواند به تیترهای ناگهانی Fed، ECB، دلار، اوراق آمریکا و فضای ریسک جهانی واکنش نشان دهد.
+
+⚠️ نکته:
+حتی در روزهای بدون خبر قرمز، سخنرانی‌های ناگهانی یا تیترهای ژئوپلیتیک می‌توانند نوسان ایجاد کنند.
+"""
+
+    def sort_key(ev):
+        dt = parse_event_datetime(ev)
+        if dt:
+            return dt.astimezone(TEHRAN_TZ)
+        return datetime.max.replace(tzinfo=TEHRAN_TZ)
+
+    events = sorted(events, key=sort_key)
+
+    lines = []
+
+    for ev in events:
+        country = ev.get("country", "")
+        title = ev.get("title", "")
+        impact = ev.get("impact", "")
+        forecast = ev.get("forecast", "")
+        previous = ev.get("previous", "")
+
+        time_fa = event_time_tehran(ev)
+        impact_fa = impact_to_fa(impact)
+        effect = expected_event_impact(ev)
+
+        block = f"""━━━━━━━━━━━━━━
+{impact_fa}
+🕒 زمان: {time_fa}
+🌍 ارز: {country}
+📌 خبر: {title}"""
+
+        if forecast:
+            block += f"\n📊 پیش‌بینی: {forecast}"
+
+        if previous:
+            block += f"\n📉 قبلی: {previous}"
+
+        block += f"""
+
+اثر احتمالی روی EUR/USD:
+{effect}
+"""
+
+        lines.append(block)
+
+    msg = f"""🌅 یادآور اقتصادی امروز EUR/USD
+
+{date_fa}
+
+امروز این خبرهای مهم و متوسط برای یورو/دلار زیر نظر هستند:
+
+{chr(10).join(lines)}
+
+⚠️ هشدار مدیریت ریسک:
+نزدیک زمان خبرهای قرمز، احتمال افزایش شدید نوسان وجود دارد. بهتر است قبل از انتشار داده، از تصمیم عجولانه و حجم بالا پرهیز شود.
+"""
+
+    return msg
 
 # واچر خبر زنده
 _notified_events=set()
