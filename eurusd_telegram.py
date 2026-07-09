@@ -654,6 +654,29 @@ def build_timeframe_view(bull, bear, calendar_events=None, breaking_news=None):
 
 • بلندمدت: {long_term}
 """
+def build_market_narrative(calendar_events, bull, bear):
+    focus = "داده‌های پراکنده فاندامنتال"
+    all_titles = " ".join([e.get('event', '') for e in calendar_events]).upper()
+    
+    if "CPI" in all_titles or "PCE" in all_titles:
+        focus = "تورم و سیاست‌های پولی"
+    elif "NFP" in all_titles or "UNEMPLOYMENT" in all_titles:
+        focus = "گزارش اشتغال و سلامت اقتصاد"
+    elif "FED" in all_titles or "FOMC" in all_titles:
+        focus = "نشست یا سخنرانی‌های فدرال رزرو"
+    elif "ECB" in all_titles or "LAGARDE" in all_titles:
+        focus = "تصمیمات بانک مرکزی اروپا"
+    elif "GDP" in all_titles:
+        focus = "رشد اقتصادی (GDP)"
+
+    if bull > bear + 15:
+        narr = f"داستان اصلی: {focus}. جو بازار به نفع یورو است."
+    elif bear > bull + 15:
+        narr = f"داستان اصلی: {focus}. جو بازار به نفع دلار است."
+    else:
+        narr = f"داستان اصلی: {focus}. بازار فعلاً در انتظار و احتیاط است."
+
+    return "\n".join(["📖 روایت اصلی بازار:", narr])
 
 def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل روزانه", breaking_news=None):
     now_utc = datetime.now(timezone.utc)
@@ -769,6 +792,11 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
     except Exception:
         currency_strength = "قدرت نسبی ارزها فعلا در دسترس نیست."
 
+    try:
+        market_narrative = build_market_narrative(cal, bull, bear)
+    except Exception:
+        market_narrative = ""
+    
     msg_parts = [
         f"{emoji} تحلیل فاندامنتال EUR/USD - {slot_label}",
         "",
@@ -805,8 +833,9 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
         "",
         f"@EURUSD_Fa_Bot | {date_short}",
         f"امتیاز خبری: صعودی {bull} / نزولی {bear}"
+        "",
+        market_narrative,
     ])
-
     msg = "\n".join(msg_parts)
 
     voice_parts = [
