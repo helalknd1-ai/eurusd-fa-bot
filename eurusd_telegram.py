@@ -1007,7 +1007,7 @@ Warning: This analysis is informational only and is not financial advice.
 
 "--------------------"
 
-📊 **خلاصه احساسات بازار:**
+ **خلاصه احساسات بازار:**
 • جهت: {direction}
 • امتیاز صعودی: {bull} | امتیاز نزولی: {bear}
 • رویدادهای مهم امروز: {len(cal) if cal else 0}
