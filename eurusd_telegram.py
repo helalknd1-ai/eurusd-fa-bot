@@ -756,7 +756,7 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
         timeframe_view = build_timeframe_view(bull, bear, calendar_events, breaking_news)
     currency_strength = build_currency_strength(bull, bear, calendar_events, breaking_news)
 
-    msg=f"""{emoji} **تحلیل فاندامنتال EUR/USD - {slot_label}**
+        msg=f"""{emoji} **تحلیل فاندامنتال EUR/USD - {slot_label}**
 
 {date_fa}
 
@@ -779,16 +779,17 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
 
 **بانک های مرکزی:**
 
-• ECB: وضعیت بانک مرکزی اروپا بر اساس خبرهای امروز و لحن اخیر بازار بررسی می شود.
-• Fed: وضعیت فدرال رزرو بر اساس داده های آمریکا، تورم، اشتغال و لحن اعضا بررسی می شود.
+- ECB: وضعیت بانک مرکزی اروپا بر اساس خبرهای امروز بررسی می شود.
+- Fed: وضعیت فدرال رزرو بر اساس داده های آمریکا بررسی می شود.
 
-**نتیجه:** جهت کوتاه مدت {direction} است. تا قبل از داده های مهم، مدیریت ریسک ضروری است.
+**نتیجه:** جهت کوتاه مدت {direction} است. مدیریت ریسک ضروری است.
 
 -
 @EURUSD_Fa_Bot | {date_short} | صدا فعال | منابع خبری
 
 امتیاز خبری: صعودی {bull} / نزولی {bear}
 """
+
     # ویس کوتاه – زنانه – بدون قیمت
     voice_text = f"""تحلیل فاندامنتال یورو دلار، {date_short}، {slot_label}.
 جهت امروز: {direction}، اطمینان {conf}.
