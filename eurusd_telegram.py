@@ -1022,7 +1022,7 @@ def run_once(slot="manual"):
         print("❌ Text send failed")
 
     if SEND_VOICE:
-        if send_telegram_voice(voice_msg):
+        if send_telegram_voice(voice_text):
             print("✅ Voice sent successfully")
         else:
             print("❌ Voice send failed")
