@@ -930,102 +930,59 @@ def send_telegram_voice(text_fa):
 
 def run_once(slot="manual"):
     print(f"[{slot}] Fetching news ...")
+
     news = fetch_news_all()
     cal = get_today_events()
-
-        # پیام یادآور صبحگاهی خبرهای High و Medium
-    if slot in ["morning", "manual"]:
-        calendar_msg = build_morning_calendar_alert(cal)
-        send_telegram_text(calendar_msg)
     bull, bear = score_sentiment(news)
-    slot_label = SCHEDULES.get(slot, {}).get("label", slot)
 
-    # 🔔 حالت watch: فقط اگه خبر High Impact جدید باشه پیام بده
-    if slot == "watch":
-        hits = check_live_news()
-        if not hits:
-            print("[watch] No new high-impact events. Skipping.")
-            return
-        print(f"[watch] {len(hits)} new event(s) found")
+    slot_info = SCHEDULES.get(slot, SCHEDULES.get("manual", {"label": slot}))
+    slot_label = slot_info.get("label", slot)
 
-    # 🤖 تحلیل با هوش مصنوعی Groq
+    if slot in ["morning", "manual"]:
+        try:
+            if "build_morning_calendar_alert" in globals():
+                calendar_msg = build_morning_calendar_alert(cal)
+                send_telegram_text(calendar_msg)
+        except Exception as ex:
+            print("Morning calendar alert error:", ex)
+
+    text_msg, voice_text = build_brief(
+        news_text=news,
+        bull=bull,
+        bear=bear,
+        calendar_events=cal,
+        slot_label=slot_label
+    )
+
     ai_analysis = ai_analyze(news, cal, bull, bear)
 
-    # 📊 محاسبه جهت بازار
-    diff = bull - bear
-    if diff >= 3:
-        direction_emoji = "🟢"
-        direction = "صعودی"
-    elif diff <= -3:
-        direction_emoji = "🔴"
-        direction = "نزولی"
-    elif diff >= 1:
-        direction_emoji = "🟡🟢"
-        direction = "خنثی متمایل به صعود"
-    elif diff <= -1:
-        direction_emoji = "🟡🔴"
-        direction = "خنثی متمایل به نزول"
-    else:
-        direction_emoji = "⚪️"
-        direction = "خنثی / رنج"
-
-    # 📅 زمان تهران
-    now_teh = datetime.now(timezone.utc) + timedelta(hours=3, minutes=30)
-    if HAS_JALALI:
-        jd = jdatetime.datetime.fromgregorian(datetime=now_teh)
-        date_fa = jd.strftime("%A %d %B %Y – %H:%M")
-    else:
-        date_fa = now_teh.strftime("%Y-%m-%d %H:%M")
-
-    # 🎨 ساخت پیام حرفه‌ای
     if ai_analysis:
         text_msg = "\n".join([
-            f"{direction_emoji} EUR/USD | {slot_label}",
-            "",
-            f"زمان تهران: {date_fa}",
+            text_msg,
             "",
             "تحلیل هوش مصنوعی:",
             "",
-            str(ai_analysis),
-            "",
-            "--------------------",
-            "خلاصه احساسات بازار:",
-            f"- جهت: {direction}",
-            f"- امتیاز صعودی: {bull}",
-            f"- امتیاز نزولی: {bear}",
-            f"- رویدادهای مهم امروز: {len(cal)}",
-            "",
-            "این تحلیل صرفا اطلاع رسانی است و توصیه معاملاتی نیست.",
-            "",
-            "@EURUSDFaBot"
-        ])
-    else:
-        text_msg = "\n".join([
-            f"{direction_emoji} EUR/USD | {slot_label}",
-            "",
-            f"زمان تهران: {date_fa}",
-            "",
-            "تحلیل هوش مصنوعی در دسترس نیست.",
-            "",
-            f"- جهت: {direction}",
-            f"- امتیاز صعودی: {bull}",
-            f"- امتیاز نزولی: {bear}",
-            f"- رویدادهای مهم امروز: {len(cal)}",
-            "",
-            "@EURUSDFaBot"
+            str(ai_analysis)
         ])
 
-    # 📤 ارسال به تلگرام
     if send_telegram_text(text_msg):
-        print("✅ Text sent successfully")
+        print("Text sent successfully")
     else:
-        print("❌ Text send failed")
+        print("Text send failed")
 
     if SEND_VOICE:
+        if not voice_text:
+            voice_text = "\n".join([
+                f"تحلیل فاندامنتال یورو دلار. {slot_label}.",
+                "این تحلیل صرفا اطلاع رسانی است.",
+                "با مدیریت ریسک معامله کنید."
+            ])
+
         if send_telegram_voice(voice_text):
-            print("✅ Voice sent successfully")
+            print("Voice sent successfully")
         else:
-            print("❌ Voice send failed")
+            print("Voice send failed")
+    
 def watch_news_loop():
     """واچر زنده – هر 60 ثانیه چک می‌کند، اگر خبر High Impact جدید منتشر شد بلافاصله تحلیل می‌فرستد"""
     print("Live news watcher started – interval", WATCH_INTERVAL_SECONDS, "sec – Ctrl+C to stop")
