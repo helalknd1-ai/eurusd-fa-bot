@@ -654,30 +654,29 @@ def build_timeframe_view(bull, bear, calendar_events=None, breaking_news=None):
 
 • بلندمدت: {long_term}
 """
-def build_market_narrative(calendar_events, bull, bear):
-    focus = "داده‌های پراکنده فاندامنتال"
-    all_titles = " ".join([e.get('event', '') for e in calendar_events]).upper()
+def build_market_narrative(cal_events, bull, bear):
+    titles = ""
+    if cal_events:
+        titles = " ".join([e.get('event', '') for e in cal_events]).upper()
     
-    if "CPI" in all_titles or "PCE" in all_titles:
-        focus = "تورم و سیاست‌های پولی"
-    elif "NFP" in all_titles or "UNEMPLOYMENT" in all_titles:
-        focus = "گزارش اشتغال و سلامت اقتصاد"
-    elif "FED" in all_titles or "FOMC" in all_titles:
-        focus = "نشست یا سخنرانی‌های فدرال رزرو"
-    elif "ECB" in all_titles or "LAGARDE" in all_titles:
-        focus = "تصمیمات بانک مرکزی اروپا"
-    elif "GDP" in all_titles:
-        focus = "رشد اقتصادی (GDP)"
-
-    if bull > bear + 15:
-        narr = f"داستان اصلی: {focus}. جو بازار به نفع یورو است."
-    elif bear > bull + 15:
-        narr = f"داستان اصلی: {focus}. جو بازار به نفع دلار است."
-    else:
-        narr = f"داستان اصلی: {focus}. بازار فعلاً در انتظار و احتیاط است."
-
-    return "\n".join(["📖 روایت اصلی بازار:", narr])
-
+    focus = "بدون خبر مهم امروز"
+    if "CPI" in titles or "PCE" in titles: focus = "تورم"
+    elif "NFP" in titles or "EMPLOYMENT" in titles: focus = "اشتغال"
+    elif "FED" in titles or "FOMC" in titles: focus = "فدرال رزرو"
+    elif "ECB" in titles: focus = "بانک مرکزی اروپا"
+    elif "GDP" in titles: focus = "رشد اقتصادی"
+    
+    status = "بازار در انتظار"
+    if bull > bear + 15: status = "تمایل صعودی به نفع یورو"
+    elif bear > bull + 15: status = "تمایل نزولی به نفع دلار"
+    
+    lines = [
+        "📖 روایت بازار:",
+        f"- تمرکز بازار: {focus}",
+        f"- وضعیت: {status}"
+    ]
+    return "\n".join(lines)
+    
 def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل روزانه", breaking_news=None):
     now_utc = datetime.now(timezone.utc)
     teh = now_utc + timedelta(hours=3, minutes=30)
