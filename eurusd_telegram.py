@@ -555,6 +555,106 @@ def score_sentiment(text):
         except: pass
     return bull, bear
 
+def build_currency_strength(bull, bear, calendar_events=None, breaking_news=None):
+    eur_score = int(bull)
+    usd_score = int(bear)
+
+    calendar_events = calendar_events or []
+
+    high_count = sum(1 for ev in calendar_events if (ev.get("impact") or "").lower() == "high")
+    medium_count = sum(1 for ev in calendar_events if (ev.get("impact") or "").lower() == "medium")
+
+    risk_level = "پایین"
+    if high_count >= 1:
+        risk_level = "بالا"
+    elif medium_count >= 1:
+        risk_level = "متوسط"
+
+    if breaking_news:
+        bn = breaking_news[0] if isinstance(breaking_news, list) else breaking_news
+        impact_text = str(bn.get("instant_impact", ""))
+
+        if "صعودی" in impact_text:
+            eur_score += 3
+        elif "نزولی" in impact_text:
+            usd_score += 3
+
+    diff = eur_score - usd_score
+
+    if diff >= 5:
+        result = "برتری فعلی با یورو است؛ فشار بنیادی بیشتر به سمت صعود EUR/USD است."
+    elif diff <= -5:
+        result = "برتری فعلی با دلار است؛ فشار بنیادی بیشتر به سمت نزول EUR/USD است."
+    elif diff > 0:
+        result = "یورو کمی برتری دارد، اما اختلاف هنوز قوی نیست."
+    elif diff < 0:
+        result = "دلار کمی برتری دارد، اما اختلاف هنوز قوی نیست."
+    else:
+        result = "قدرت یورو و دلار تقریباً برابر است؛ بازار حالت خنثی و رنج دارد."
+
+    return f"""⚖️ قدرت نسبی ارزها:
+
+• قدرت EUR: {eur_score}
+• قدرت USD: {usd_score}
+• ریسک تقویم امروز: {risk_level}
+
+نتیجه:
+{result}
+"""
+
+def build_timeframe_view(bull, bear, calendar_events=None, breaking_news=None):
+    """
+    ساخت دید لحظه‌ای، امروز و بلندمدت برای EUR/USD
+    """
+
+    diff = bull - bear
+    calendar_events = calendar_events or []
+
+    high_events = [
+        ev for ev in calendar_events
+        if (ev.get("impact") or "").lower() == "high"
+    ]
+
+    medium_events = [
+        ev for ev in calendar_events
+        if (ev.get("impact") or "").lower() == "medium"
+    ]
+
+    # دید لحظه‌ای
+    if breaking_news:
+        instant = "بازار در حال واکنش به خبر تازه منتشرشده است؛ جهت لحظه‌ای باید با actual نسبت به forecast سنجیده شود."
+    elif diff >= 3:
+        instant = "متمایل به صعود EUR/USD؛ فشار خبری فعلی بیشتر علیه دلار یا به نفع یورو است."
+    elif diff <= -3:
+        instant = "متمایل به نزول EUR/USD؛ جریان خبری فعلی بیشتر به نفع دلار یا علیه یورو است."
+    else:
+        instant = "خنثی تا رنج؛ بازار فعلاً سیگنال لحظه‌ای قوی ندارد."
+
+    # دید امروز
+    if high_events:
+        today = "امروز بازار زیر سایه خبرهای قرمز است؛ تا قبل از انتشار داده‌های مهم، احتیاط و نوسان‌گیری کوتاه‌مدت محتمل‌تر است."
+    elif medium_events:
+        today = "امروز خبرهای نارنجی می‌توانند جهت کوتاه‌مدت بدهند، اما برای روند قوی نیاز به تأیید از دلار، اوراق و لحن بانک‌های مرکزی است."
+    else:
+        today = "امروز از نظر تقویم اقتصادی فشار خبری سنگین دیده نمی‌شود؛ تیترهای Fed، ECB و احساسات ریسک جهانی مهم‌تر می‌شوند."
+
+    # دید بلندمدت
+    if diff >= 6:
+        long_term = "در نمای کلان، اگر ضعف دلار ادامه پیدا کند، EUR/USD می‌تواند حمایت بنیادی بیشتری بگیرد؛ اما تأیید آن به داده‌های تورم و سیاست Fed نیاز دارد."
+    elif diff <= -6:
+        long_term = "در نمای کلان، برتری نسبی دلار فعلاً پررنگ‌تر است؛ تا وقتی داده‌های آمریکا قوی بماند یا Fed هاوکیش باشد، فشار روی EUR/USD باقی می‌ماند."
+    else:
+        long_term = "دید بلندمدت فعلاً خنثی است؛ مسیر اصلی به تفاوت سیاست‌های Fed و ECB، تورم و رشد اقتصادی دو طرف بستگی دارد."
+
+    return f"""📌 جمع‌بندی چندزمانه:
+
+• لحظه‌ای: {instant}
+
+• امروز: {today}
+
+• بلندمدت: {long_term}
+"""
+
 def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل روزانه", breaking_news=None):
     import re
     now_utc=datetime.now(timezone.utc)
@@ -653,14 +753,17 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
         calendar_text="\n".join(cal_lines) if cal_lines else "• امروز رویداد High Impact ثبت نشده"
     else:
         calendar_text="• امروز رویداد High Impact ثبت نشده – بازار تکنیکال"
-
+    timeframe_view = build_timeframe_view(bull, bear, calendar_events, breaking_news)
+    currency_strength = build_currency_strength(bull, bear, calendar_events, breaking_news)
+        
     msg=f"""{emoji} **تحلیل فاندامنتال EUR/USD – {slot_label}**
 {date_fa}
 
 {breaking_block}**جهت فاندامنتال: {direction}**
 تمایل: {bias}
 اطمینان: {conf}
-
+{timeframe_view}
+{currency_strength}
 **خلاصه بلومبرگ + منابع:**
 {bullets}
 
