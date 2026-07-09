@@ -964,13 +964,13 @@ def run_once(slot="manual"):
 
 Date: {date_fa} Tehran
 
-━━━━━━━━━━━━━━━━━━━━
+"--------------------"
 
 **AI Analysis:**
 
 {ai_analysis}
 
-━━━━━━━━━━━━━━━━━━━━
+"--------------------"
 
 **Market Sentiment Summary:**
 
@@ -979,21 +979,21 @@ Date: {date_fa} Tehran
 - Bearish score: {bear}
 - Important events today: {len(cal)}
 
-━━━━━━━━━━━━━━━━━━━━
+"--------------------"
 
 Warning: This analysis is informational only and is not financial advice.
 
 @EURUSDFaBot
 """
 
-━━━━━━━━━━━━━━━━━━━━
+"--------------------"
 
 📊 **خلاصه احساسات بازار:**
 • جهت: {direction}
 • امتیاز صعودی: {bull} | امتیاز نزولی: {bear}
 • رویدادهای مهم امروز: {len(cal) if cal else 0}
 
-━━━━━━━━━━━━━━━━━━━━
+"--------------------"
 
 ⚠️ *این تحلیل صرفاً جنبه اطلاع‌رسانی دارد و توصیه معاملاتی نیست.*
 
