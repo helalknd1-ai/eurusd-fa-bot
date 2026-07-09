@@ -280,10 +280,11 @@ def expected_event_impact(event):
             "عدد ضعیف‌تر از پیش‌بینی معمولاً به ضرر دلار و به نفع EUR/USD است."
         )
 
-    if country == "USD" and any(k in title for k in ["unemployment rate", "jobless claims", "initial jobless", "continuing claims"]):
+    if country == "USD" and any(k in title for k in ["unemployment claims", "unemployment rate", "jobless claims", "initial jobless", "continuing claims", "claims"]):
         return (
-            "عدد بالاتر از پیش‌بینی معمولاً نشانه ضعف بازار کار آمریکا است و می‌تواند دلار را تضعیف کند؛ این حالت برای EUR/USD حمایتی است. "
-            "عدد پایین‌تر از پیش‌بینی معمولاً به نفع دلار است و می‌تواند روی EUR/USD فشار نزولی ایجاد کند."
+            "برای داده‌های مطالبات بیکاری آمریکا، عدد بالاتر از پیش‌بینی معمولاً نشانه ضعف بازار کار است؛ "
+            "این حالت می‌تواند دلار را تضعیف کند و برای EUR/USD حمایتی باشد. "
+            "عدد پایین‌تر از پیش‌بینی معمولاً نشانه بازار کار قوی‌تر است، می‌تواند دلار را تقویت کند و روی EUR/USD فشار نزولی بگذارد."
         )
 
     if country == "USD" and any(k in title for k in ["average hourly earnings", "wages", "wage"]):
@@ -327,7 +328,45 @@ def expected_event_impact(event):
     return (
         "این خبر می‌تواند روی احساسات بازار اثر بگذارد. هنگام انتشار باید عدد واقعی با پیش‌بینی مقایسه شود."
     )
+def event_number(value):
+    m = re.search(r'[-+]?\d+(?:\.\d+)?', str(value or "").replace(",", ""))
+    return float(m.group()) if m else None
 
+
+def released_event_impact(event):
+    title = (event.get("title") or "").lower()
+    country = (event.get("country") or "").upper()
+
+    actual = event_number(event.get("actual"))
+    forecast = event_number(event.get("forecast"))
+
+    if actual is None or forecast is None:
+        return "خبر منتشر شده، اما برای تحلیل دقیق باید عدد واقعی با پیش‌بینی مقایسه شود."
+
+    if actual == forecast:
+        return "عدد واقعی مطابق پیش‌بینی منتشر شد؛ اثر اولیه روی EUR/USD خنثی است."
+
+    higher = actual > forecast
+
+    if country == "USD" and any(k in title for k in ["unemployment claims", "jobless claims", "unemployment rate", "claims"]):
+        if higher:
+            return "عدد بیکاری بالاتر از پیش‌بینی آمد؛ این معمولاً دلار را تضعیف می‌کند و برای EUR/USD صعودی است."
+        else:
+            return "عدد بیکاری پایین‌تر از پیش‌بینی آمد؛ این معمولاً دلار را تقویت می‌کند و برای EUR/USD نزولی است."
+
+    if country == "USD":
+        if higher:
+            return "عدد آمریکا قوی‌تر از پیش‌بینی آمد؛ این معمولاً دلار را تقویت می‌کند و برای EUR/USD نزولی است."
+        else:
+            return "عدد آمریکا ضعیف‌تر از پیش‌بینی آمد؛ این معمولاً دلار را تضعیف می‌کند و برای EUR/USD صعودی است."
+
+    if country in ["EUR", "EMU"]:
+        if higher:
+            return "عدد اروپا بهتر از پیش‌بینی آمد؛ این معمولاً یورو را تقویت می‌کند و برای EUR/USD صعودی است."
+        else:
+            return "عدد اروپا ضعیف‌تر از پیش‌بینی آمد؛ این معمولاً یورو را تضعیف می‌کند و برای EUR/USD نزولی است."
+
+    return "خبر منتشر شد؛ اثر آن باید در کنار واکنش دلار و یورو بررسی شود."
 
 def build_morning_calendar_alert(calendar_events):
     """
@@ -418,8 +457,8 @@ def build_morning_calendar_alert(calendar_events):
 
 {chr(10).join(lines)}
 
-⚠️ هشدار مدیریت ریسک:
-نزدیک زمان خبرهای قرمز، احتمال افزایش شدید نوسان وجود دارد. بهتر است قبل از انتشار داده، از تصمیم عجولانه و حجم بالا پرهیز شود.
+⚠️ هشدار مدیریت ریسک
+:نزدیک زمان خبرهای قرمز و نارنجی، احتمال افزایش نوسان وجود دارد. بهتر است قبل از انتشار داده، از تصمیم عجولانه و حجم بالا پرهیز شود.
 """
 
     return msg
@@ -486,14 +525,19 @@ def check_live_news():
             # تفسیر سریع
             # قانون ساده: اگر USD خبر بدتر از forecast → یورو صعودی
             # این خیلی ساده است – بعدا قابل ارتقا
-            hits.append({
+            item = {
                 "title": title,
                 "country": country,
                 "actual": actual,
                 "forecast": forecast,
                 "previous": previous,
-                "time": ev.get("time","")
-            })
+                "time": ev.get("time", "")
+            }
+
+            item["instant_impact"] = released_event_impact(item)
+
+            hits.append(item)
+        
         return hits
     except Exception as ex:
         return []
@@ -544,10 +588,8 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
 • {bn.get('country','')} – {bn.get('title','')}
 واقعی: {bn.get('actual','')} | پیش‌بینی: {bn.get('forecast','')} | قبلی: {bn.get('previous','')}
 
-نظر فوری من: {"یورو تقویت می‌شود – فشار نزولی دلار" if bn.get('country')=='USD' and 'weak' in str(bn).lower() or True else "در حال ارزیابی ..."}
-این خبر الان وارد تحلیل شد.
-——————————————
-"""
+نظر فوری من: {bn.get('instant_impact') or released_event_impact(bn)}
+
         # تفسیر ساده اتومات
         # اگر USD و actual بدتر از forecast → bullish EUR
         try:
