@@ -754,42 +754,37 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
     else:
         calendar_text="• امروز رویداد High Impact ثبت نشده – بازار تکنیکال"
         timeframe_view = build_timeframe_view(bull, bear, calendar_events, breaking_news)
-    currency_strength = build_currency_strength(bull, bear, calendar_events, breaking_news)
+        currency_strength = build_currency_strength(bull, bear, calendar_events, breaking_news)
 
-        msg=f"""{emoji} **تحلیل فاندامنتال EUR/USD - {slot_label}**
-
-{date_fa}
-
-{breaking_block}**جهت فاندامنتال: {direction}**
-
-تمایل: {bias}
-اطمینان: {conf}
-
-{timeframe_view}
-
-{currency_strength}
-
-**خلاصه بلومبرگ + منابع:**
-
-{bullets}
-
-**تقویم اقتصادی امروز/فردا:**
-
-{calendar_text}
-
-**بانک های مرکزی:**
-
-- ECB: وضعیت بانک مرکزی اروپا بر اساس خبرهای امروز بررسی می شود.
-- Fed: وضعیت فدرال رزرو بر اساس داده های آمریکا بررسی می شود.
-
-**نتیجه:** جهت کوتاه مدت {direction} است. مدیریت ریسک ضروری است.
-
--
-@EURUSD_Fa_Bot | {date_short} | صدا فعال | منابع خبری
-
-امتیاز خبری: صعودی {bull} / نزولی {bear}
-"""
-
+            msg = "\n".join([
+        f"{emoji} تحلیل فاندامنتال EUR/USD - {slot_label}",
+        "",
+        str(date_fa),
+        "",
+        str(breaking_block),
+        f"جهت فاندامنتال: {direction}",
+        f"تمایل: {bias}",
+        f"اطمینان: {conf}",
+        "",
+        str(timeframe_view),
+        "",
+        str(currency_strength),
+        "",
+        "خلاصه منابع:",
+        str(bullets),
+        "",
+        "تقویم اقتصادی امروز/فردا:",
+        str(calendar_text),
+        "",
+        "بانک های مرکزی:",
+        "- ECB: وضعیت بانک مرکزی اروپا بر اساس خبرهای امروز بررسی می شود.",
+        "- Fed: وضعیت فدرال رزرو بر اساس داده های آمریکا بررسی می شود.",
+        "",
+        f"نتیجه: جهت کوتاه مدت {direction} است. مدیریت ریسک ضروری است.",
+        "",
+        f"@EURUSD_Fa_Bot | {date_short}",
+        f"امتیاز خبری: صعودی {bull} / نزولی {bear}"
+    ])
     # ویس کوتاه – زنانه – بدون قیمت
    voice_text = f"""تحلیل فاندامنتال یورو دلار - {date_short} - {slot_label}.
 
