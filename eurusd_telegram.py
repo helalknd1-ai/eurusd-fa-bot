@@ -978,50 +978,42 @@ def run_once(slot="manual"):
         date_fa = now_teh.strftime("%Y-%m-%d %H:%M")
 
     # 🎨 ساخت پیام حرفه‌ای
-        if ai_analysis:
-        text_msg = f"""{direction_emoji} **EUR/USD | {slot_label}**
-
-Date: {date_fa} Tehran
-
-"--------------------"
-
-**AI Analysis:**
-
-{ai_analysis}
-
-"--------------------"
-
-**Market Sentiment Summary:**
-
-- Direction: {direction}
-- Bullish score: {bull}
-- Bearish score: {bear}
-- Important events today: {len(cal)}
-
-"--------------------"
-
-Warning: This analysis is informational only and is not financial advice.
-
-@EURUSDFaBot
-"""
-
-"--------------------"
-
- **خلاصه احساسات بازار:**
-• جهت: {direction}
-• امتیاز صعودی: {bull} | امتیاز نزولی: {bear}
-• رویدادهای مهم امروز: {len(cal) if cal else 0}
-
-"--------------------"
-
-⚠️ *این تحلیل صرفاً جنبه اطلاع‌رسانی دارد و توصیه معاملاتی نیست.*
-
-@EURUSD_Fa_Bot"""
-        # ویس از تحلیل AI ساخته میشه
-        voice_msg = f"تحلیل یورو دلار، {slot_label}.\n\n{ai_analysis[:1200]}"
+    if ai_analysis:
+        text_msg = "\n".join([
+            f"{direction_emoji} EUR/USD | {slot_label}",
+            "",
+            f"زمان تهران: {date_fa}",
+            "",
+            "تحلیل هوش مصنوعی:",
+            "",
+            str(ai_analysis),
+            "",
+            "--------------------",
+            "خلاصه احساسات بازار:",
+            f"- جهت: {direction}",
+            f"- امتیاز صعودی: {bull}",
+            f"- امتیاز نزولی: {bear}",
+            f"- رویدادهای مهم امروز: {len(cal)}",
+            "",
+            "این تحلیل صرفا اطلاع رسانی است و توصیه معاملاتی نیست.",
+            "",
+            "@EURUSDFaBot"
+        ])
     else:
-        # اگه AI کار نکرد، به روش قدیمی برو
-        text_msg, voice_msg = build_brief(news, bull, bear, cal, slot_label=slot_label)
+        text_msg = "\n".join([
+            f"{direction_emoji} EUR/USD | {slot_label}",
+            "",
+            f"زمان تهران: {date_fa}",
+            "",
+            "تحلیل هوش مصنوعی در دسترس نیست.",
+            "",
+            f"- جهت: {direction}",
+            f"- امتیاز صعودی: {bull}",
+            f"- امتیاز نزولی: {bear}",
+            f"- رویدادهای مهم امروز: {len(cal)}",
+            "",
+            "@EURUSDFaBot"
+        ])
 
     # 📤 ارسال به تلگرام
     if send_telegram_text(text_msg):
