@@ -756,7 +756,7 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
     timeframe_view = build_timeframe_view(bull, bear, calendar_events, breaking_news)
     currency_strength = build_currency_strength(bull, bear, calendar_events, breaking_news)
         
-    msg=f"""{emoji} **تحلیل فاندامنتال EUR/USD – {slot_label}**
+    msg=f"""{emoji} **تحلیل فاندامنتال EUR/USD - {slot_label}**
 {date_fa}
 
 {breaking_block}**جهت فاندامنتال: {direction}**
