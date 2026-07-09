@@ -959,15 +959,32 @@ def run_once(slot="manual"):
         date_fa = now_teh.strftime("%Y-%m-%d %H:%M")
 
     # 🎨 ساخت پیام حرفه‌ای
-    if ai_analysis:
+        if ai_analysis:
         text_msg = f"""{direction_emoji} **EUR/USD | {slot_label}**
-📅 {date_fa} (تهران)
+
+Date: {date_fa} Tehran
 
 ━━━━━━━━━━━━━━━━━━━━
 
-🤖 **تحلیل هوش مصنوعی:**
+**AI Analysis:**
 
 {ai_analysis}
+
+━━━━━━━━━━━━━━━━━━━━
+
+**Market Sentiment Summary:**
+
+- Direction: {direction}
+- Bullish score: {bull}
+- Bearish score: {bear}
+- Important events today: {len(cal)}
+
+━━━━━━━━━━━━━━━━━━━━
+
+Warning: This analysis is informational only and is not financial advice.
+
+@EURUSDFaBot
+"""
 
 ━━━━━━━━━━━━━━━━━━━━
 
