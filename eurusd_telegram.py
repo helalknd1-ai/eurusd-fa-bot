@@ -758,7 +758,7 @@ def run_once(slot="manual"):
     cal = get_today_events()
 
         # پیام یادآور صبحگاهی خبرهای High و Medium
-    if slot == "morning":
+    if slot in ["morning", "manual"]:
         calendar_msg = build_morning_calendar_alert(cal)
         send_telegram_text(calendar_msg)
     bull, bear = score_sentiment(news)
