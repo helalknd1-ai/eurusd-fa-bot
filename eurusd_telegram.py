@@ -756,28 +756,37 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
     timeframe_view = build_timeframe_view(bull, bear, calendar_events, breaking_news)
     currency_strength = build_currency_strength(bull, bear, calendar_events, breaking_news)
         
-    msg=f"""{emoji} **تحلیل فاندامنتال EUR/USD - {slot_label}**
+        msg=f"""{emoji} **تحلیل فاندامنتال EUR/USD - {slot_label}**
+
 {date_fa}
 
 {breaking_block}**جهت فاندامنتال: {direction}**
+
 تمایل: {bias}
 اطمینان: {conf}
+
 {timeframe_view}
+
 {currency_strength}
+
 **خلاصه بلومبرگ + منابع:**
+
 {bullets}
 
 **تقویم اقتصادی امروز/فردا:**
+
 {calendar_text}
 
-**بانک‌های مرکزی:**
-• ECB: پس از hike ژوئن، با تورم کاهشی در حالت توقف – لاگارد داویش
-• Fed: داده اشتغال ضعیف، احتمال افزایش نرخ کاهش یافت – وارش محتاط
+**بانک های مرکزی:**
 
-**نتیجه:** بازار رنج بین دو بانک مرکزی در حالت مکث. جهت کوتاه‌مدت {direction}، بدون روند پایدار تا CPI بعدی.
+• ECB: وضعیت بانک مرکزی اروپا بر اساس خبرهای امروز و لحن اخیر بازار بررسی می شود.
+• Fed: وضعیت فدرال رزرو بر اساس داده های آمریکا، تورم، اشتغال و لحن اعضا بررسی می شود.
 
-—
-@EURUSD_Fa_Bot | {date_short} | صدای زنانه ✓ | بلومبرگ ✓
+**نتیجه:** جهت کوتاه مدت {direction} است. تا قبل از داده های مهم، مدیریت ریسک ضروری است.
+
+-
+@EURUSD_Fa_Bot | {date_short} | صدا فعال | منابع خبری
+
 امتیاز خبری: صعودی {bull} / نزولی {bear}
 """
     # ویس کوتاه – زنانه – بدون قیمت
