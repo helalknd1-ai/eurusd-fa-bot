@@ -793,8 +793,10 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
 
     try:
         market_narrative = build_market_narrative(cal, bull, bear)
-    except Exception:
-        market_narrative = ""
+    if not market_narrative:
+        market_narrative = "📖 روایت بازار: (متن خالی)"
+    except Exception as e:
+        market_narrative = f"📖 روایت بازار: خطا - {str(e)[:100]}"
     
     msg_parts = [
         f"{emoji} تحلیل فاندامنتال EUR/USD - {slot_label}",
