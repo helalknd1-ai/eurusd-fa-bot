@@ -785,6 +785,7 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
         f"@EURUSD_Fa_Bot | {date_short}",
         f"امتیاز خبری: صعودی {bull} / نزولی {bear}"
     ])
+    
     # ویس کوتاه – زنانه – بدون قیمت
    voice_text = f"""تحلیل فاندامنتال یورو دلار - {date_short} - {slot_label}.
 
