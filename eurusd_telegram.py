@@ -655,27 +655,45 @@ def build_timeframe_view(bull, bear, calendar_events=None, breaking_news=None):
 • بلندمدت: {long_term}
 """
 def build_market_narrative(cal_events, bull, bear):
-    titles = ""
+    try:
+        titles = ""
     if cal_events:
-        titles = " ".join([e.get('event', '') for e in cal_events]).upper()
-    
-    focus = "بدون خبر مهم امروز"
-    if "CPI" in titles or "PCE" in titles: focus = "تورم"
-    elif "NFP" in titles or "EMPLOYMENT" in titles: focus = "اشتغال"
-    elif "FED" in titles or "FOMC" in titles: focus = "فدرال رزرو"
-    elif "ECB" in titles: focus = "بانک مرکزی اروپا"
-    elif "GDP" in titles: focus = "رشد اقتصادی"
-    
-    status = "بازار در انتظار"
-    if bull > bear + 15: status = "تمایل صعودی به نفع یورو"
-    elif bear > bull + 15: status = "تمایل نزولی به نفع دلار"
-    
-    lines = [
-        "📖 روایت بازار:",
-        f"- تمرکز بازار: {focus}",
-        f"- وضعیت: {status}"
-    ]
-    return "\n".join(lines)
+            tmp = []
+    for e in cal_events:
+    try:
+        tmp.append(str(e.get('event','')))
+    except:
+           pass
+         titles = " ".join(tmp).upper()
+        focus = "بدون خبر مهم امروز"
+     if "CPI" in titles or "PCE" in titles:
+            focus = "تورم"
+     elif "NFP" in titles or "EMPLOYMENT" in titles:
+            focus = "اشتغال"
+     elif "FED" in titles or "FOMC" in titles:
+            focus = "فدرال رزرو"
+     elif "ECB" in titles:
+            focus = "بانک مرکزی اروپا"
+     elif "GDP" in titles:
+            focus = "رشد اقتصادی"
+        status = "بازار در انتظار"
+     try:
+            b = int(bull)
+            be = int(bear)
+      if b > be + 15:
+                status = "تمایل صعودی به نفع یورو"
+     elif be > b + 15:
+                status = "تمایل نزولی به نفع دلار"
+        except:
+            pass
+        lines = [
+            "📖 روایت بازار:",
+            f"- تمرکز بازار: {focus}",
+            f"- وضعیت: {status}"
+        ]
+        return "\n".join(lines)
+    except Exception as ex:
+        return f"📖 روایت بازار:\n- خطای داخلی: {str(ex)[:60]}"
     
 def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل روزانه", breaking_news=None):
     now_utc = datetime.now(timezone.utc)
@@ -791,10 +809,10 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
     except Exception:
         currency_strength = "قدرت نسبی ارزها فعلا در دسترس نیست."
 
-    try:
-        market_narrative = build_market_narrative(cal, bull, bear)
+    try: 
+         market_narrative = build_market_narrative(calendar_events, bull, bear)
     except Exception as e:
-        market_narrative = "روایت بازار: خطا"
+         market_narrative = f"📖 روایت بازار: خطا - {str(e)[:80]}"
     
     msg_parts = [
         f"{emoji} تحلیل فاندامنتال EUR/USD - {slot_label}",
