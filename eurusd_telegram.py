@@ -975,6 +975,29 @@ def send_telegram_voice(text_fa):
         except: pass
 
 def run_once(slot="manual"):
+                   if slot == "watch":
+            print("[watch] Checking breaking news only...")
+            try:
+                hits = check_live_news()
+                if hits:
+                    msg_parts = ["🚨 خبر فوری EUR/USD:"]
+                    for h in hits[:3]:
+                        title = h.get("title", "")
+                        country = h.get("country", "")
+                        actual = h.get("actual", "")
+                        forecast = h.get("forecast", "")
+                        line = f"- {country} | {title}"
+                        if actual and forecast:
+                            line += f" | Actual: {actual} / Forecast: {forecast}"
+                        msg_parts.append(line)
+                    send_telegram_text("\n".join(msg_parts))
+                    print(f"[watch] Sent {len(hits)} breaking news")
+                else:
+                    print("[watch] No breaking news. Silent exit.")
+            except Exception as e:
+                print(f"[watch] Error: {e}")
+            return
+        
     print(f"[{slot}] Fetching news ...")
 
     news = fetch_news_all()
@@ -1078,4 +1101,8 @@ if __name__=="__main__":
     if args.watch:
         watch_news_loop()
     else:
-        run_once(args.slot if args.slot else "manual")
+    slot = args.slot if args.slot else "manual"
+    if slot == "watch":
+        check_breaking_only()
+    else:
+        run_once(slot)
