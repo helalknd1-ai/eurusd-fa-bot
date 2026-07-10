@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-EUR/USD Fundamental Brief – Persian – Telegram v3
+EUR/USD Fundamental Brief – Persian – Telegram
 - تحلیل فاندامنتال EUR/USD به فارسی
-- ارسال 4 نوبت روزانه + خبر فوری
+- ارسال 4 نوبت روزانه + چک خبر فوری
 - بدون قیمت معاملاتی
 """
+
 import os
 import re
 import time
-import hashlib
 import argparse
 import requests
 import feedparser
@@ -39,80 +39,27 @@ except Exception as e:
     HAS_GROQ = False
     print("Groq not available:", e)
 
-
-def ai_analyze(news_text, calendar_events, bull_score, bear_score):
-    """تحلیل هوشمند با Groq AI"""
-    if not HAS_GROQ:
-        return None
-    try:
-        cal_summary = ""
-        if calendar_events:
-            for ev in calendar_events[:5]:
-                cal_summary += (
-                    f"- {ev.get('country', '')}: "
-                    f"{ev.get('title', '')} "
-                    f"(پیش‌بینی: {ev.get('forecast', 'N/A')})\n"
-                )
-
-        prompt = (
-            "تو یک تحلیل‌گر حرفه‌ای فاندامنتال بازار فارکس هستی، "
-            "متخصص جفت‌ارز EUR/USD.\n\n"
-            "بر اساس اخبار و داده‌های زیر، یک تحلیل کوتاه "
-            "(حداکثر 300 کلمه) به زبان فارسی روان و حرفه‌ای بنویس:\n\n"
-            f"اخبار امروز:\n{news_text[:3500]}\n\n"
-            f"تقویم اقتصادی:\n"
-            f"{cal_summary if cal_summary else 'رویداد مهمی ثبت نشده'}\n\n"
-            f"امتیاز احساسات: صعودی={bull_score} | نزولی={bear_score}\n\n"
-            "لطفاً تحلیلت شامل این بخش‌ها باشه:\n"
-            "1. جهت کلی بازار با دلیل\n"
-            "2. وضعیت بانک‌های مرکزی ECB و Fed\n"
-            "3. ریسک‌های مهم امروز\n"
-            "4. توصیه کلی برای معامله‌گران بدون قیمت دقیق\n\n"
-            "فقط تحلیل فارسی بنویس، بدون مقدمه."
-        )
-
-        response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "تو یک تحلیل‌گر خبره بازار فارکس هستی "
-                        "که به فارسی روان تحلیل می‌نویسی."
-                    ),
-                },
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.7,
-            max_tokens=800,
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as ex:
-        print("AI analyze error:", ex)
-        return None
-
-
 # ---------- CONFIG ----------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "PUT_YOURS")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "PUT_YOURS")
 SEND_VOICE = os.getenv("SEND_VOICE", "true").lower() == "true"
+
 VOICE_NAME = os.getenv("VOICE_NAME", "fa-IR-DilaraNeural")
 VOICE_RATE = os.getenv("VOICE_RATE", "-5%")
 VOICE_PITCH = os.getenv("VOICE_PITCH", "+2Hz")
+
 NEWS_IMPACT_LEVELS = os.getenv("NEWS_IMPACT", "High,Medium").split(",")
 
 TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
 SCHEDULES = {
-    "morning":      {"hour": 7,  "minute": 30, "label": "🌅 صبح – تحلیل باز شدن اروپا"},
-    "news_morning": {"hour": 7,  "minute": 40, "label": "☕ صبح – آپدیت خبری"},
-    "us_preopen":   {"hour": 16, "minute": 0,  "label": "🌆 قبل بازار آمریکا"},
-    "evening":      {"hour": 18, "minute": 0,  "label": "🌙 عصر – جمع‌بندی روز"},
-    "watch":        {"hour": 0,  "minute": 0,  "label": "🔔 رصد اخبار فوری"},
-    "manual":       {"hour": 0,  "minute": 0,  "label": "🔧 اجرای دستی"},
+    "morning": {"hour": 7, "minute": 30, "label": "🌅 صبح – تحلیل باز شدن اروپا"},
+    "news_morning": {"hour": 7, "minute": 40, "label": "☕ صبح – آپدیت خبری"},
+    "us_preopen": {"hour": 16, "minute": 0, "label": "🌆 قبل بازار آمریکا"},
+    "evening": {"hour": 18, "minute": 0, "label": "🌙 عصر – جمع‌بندی روز"},
+    "watch": {"hour": 0, "minute": 0, "label": "🔔 رصد اخبار فوری"},
+    "manual": {"hour": 0, "minute": 0, "label": "🔧 اجرای دستی"},
 }
-
-WATCH_INTERVAL_SECONDS = int(os.getenv("WATCH_INTERVAL", "60"))
 
 SOURCES = {
     "bloomberg_rss": [
@@ -120,10 +67,10 @@ SOURCES = {
         "https://feeds.bloomberg.com/economics/news.rss",
     ],
     "bloomberg_web": "https://www.bloomberg.com/markets/currencies",
-    "fxstreet_rss":  "https://www.fxstreet.com/news/forex/feed",
-    "forexlive":     "https://www.forexlive.com/feed/",
-    "ecb_press":     "https://www.ecb.europa.eu/rss/press.html",
-    "fed_press":     "https://www.federalreserve.gov/feeds/press_all.xml",
+    "fxstreet_rss": "https://www.fxstreet.com/news/forex/feed",
+    "forexlive": "https://www.forexlive.com/feed/",
+    "ecb_press": "https://www.ecb.europa.eu/rss/press.html",
+    "fed_press": "https://www.federalreserve.gov/feeds/press_all.xml",
 }
 
 HEADERS = {
@@ -136,44 +83,84 @@ HEADERS = {
 }
 
 BULLISH = [
-    "weak nfp", "weak jobs", "miss", "dovish fed", "fed pause",
-    "fed cut", "dollar falls", "dollar weak", "dxy down",
-    "ecb hike", "lagarde hawkish", "euro rises", "risk on",
-    "warsh dovish", "cpi cool us", "inflation cools us",
-    "unemployment rises",
+    "dovish fed",
+    "fed cut",
+    "fed pause",
+    "soft us cpi",
+    "cooling inflation",
+    "weak nfp",
+    "weak payrolls",
+    "higher jobless claims",
+    "lower treasury yields",
+    "ecb hawkish",
+    "eurozone inflation beats",
+    "dollar weak",
+    "dxy down",
 ]
+
 BEARISH = [
-    "strong nfp", "strong jobs", "beat", "hawkish fed", "fed hike",
-    "warsh hawkish", "dollar rises", "dollar strong", "dxy up",
-    "safe haven", "ecb dovish", "ecb pause", "lagarde dovish",
-    "inflation cools eu", "hicp eases", "eur falls", "oil spike",
-    "iran", "hormuz", "risk off", "cpi hot us",
+    "hawkish fed",
+    "fed hike",
+    "hot us cpi",
+    "strong nfp",
+    "strong payrolls",
+    "lower jobless claims",
+    "higher treasury yields",
+    "ecb dovish",
+    "eurozone inflation misses",
+    "dollar strong",
+    "dxy up",
 ]
 
-# ---------- فایل ضد تکرار ----------
-SEEN_EVENTS_FILE = "/tmp/eurusd_seen_events.txt"
-SEEN_HEADLINES_FILE = "/tmp/eurusd_seen_headlines.txt"
 
-
-def load_seen_set(filepath):
-    """بارگذاری آیدی‌های دیده‌شده از فایل"""
+def clean_html_text(text):
     try:
-        if os.path.exists(filepath):
-            with open(filepath, "r") as f:
-                return set(line.strip() for line in f if line.strip())
+        return BeautifulSoup(str(text), "html.parser").get_text(" ", strip=True)
     except Exception:
-        pass
-    return set()
+        return str(text or "").strip()
 
 
-def save_seen_set(filepath, seen_set):
-    """ذخیره آیدی‌های دیده‌شده در فایل"""
-    try:
-        with open(filepath, "w") as f:
-            for item in seen_set:
-                f.write(item + "\n")
-    except Exception:
-        pass
+def is_relevant_news(text):
+    """
+    فقط خبرهای نسبتاً مرتبط با EUR/USD را نگه می‌دارد
+    """
+    low = clean_html_text(text).lower()
+
+    direct_terms = [
+        "eur/usd", "eurusd", "euro", "usd", "dollar",
+        "ecb", "fed", "fomc", "powell", "lagarde",
+        "eurozone", "treasury yields", "dxy"
+    ]
+
+    macro_terms = [
+        "inflation", "cpi", "pce", "nfp", "payroll",
+        "employment", "unemployment", "jobless claims",
+        "claims", "pmi", "gdp", "retail sales",
+        "interest rate", "rate cut", "rate hike", "yield"
+    ]
+
+    region_terms = [
+        "us", "u.s.", "united states", "america",
+        "euro area", "eurozone", "europe", "germany", "france"
+    ]
+
+    geo_terms = [
+        "iran", "hormuz", "war", "oil", "geopolitical",
+        "risk-off", "risk off"
+    ]
+
+    if any(k in low for k in direct_terms):
+        return True
+
+    if any(k in low for k in macro_terms) and any(k in low for k in region_terms):
+        return True
+
+    if any(k in low for k in geo_terms) and any(
+        k in low for k in ["dollar", "euro", "fed", "ecb", "yield", "treasury", "risk"]
+    ):
+        return True
+
+    return False
 
 
 # ---------- FETCH ----------
@@ -182,9 +169,12 @@ def fetch_rss(url, n=15):
     try:
         d = feedparser.parse(url)
         for e in d.entries[:n]:
-            out.append(
-                f"{getattr(e, 'title', '')} {getattr(e, 'summary', '')}"
-            )
+            title = clean_html_text(getattr(e, "title", ""))
+            summary = clean_html_text(getattr(e, "summary", ""))
+            text = f"{title}. {summary}".strip()
+
+            if is_relevant_news(text):
+                out.append(text[:350])
     except Exception:
         pass
     return out
@@ -192,32 +182,30 @@ def fetch_rss(url, n=15):
 
 def fetch_bloomberg():
     texts = []
+
     for rss in SOURCES["bloomberg_rss"]:
         texts += fetch_rss(rss, 15)
+
     try:
-        r = requests.get(
-            SOURCES["bloomberg_web"], headers=HEADERS, timeout=12
-        )
+        r = requests.get(SOURCES["bloomberg_web"], headers=HEADERS, timeout=12)
         if r.status_code == 200:
             soup = BeautifulSoup(r.text, "html.parser")
             for tag in soup.select("a, h3, h2")[:60]:
-                t = tag.get_text(strip=True)
-                if t and any(
-                    k in t.lower()
-                    for k in ["euro", "dollar", "eur", "fed",
-                               "ecb", "inflation", "fx"]
-                ):
-                    if 25 < len(t) < 220:
-                        texts.append(t)
+                t = clean_html_text(tag.get_text(strip=True))
+                if 25 < len(t) < 220 and is_relevant_news(t):
+                    texts.append(t)
     except Exception:
         pass
+
     seen = set()
     uniq = []
     for x in texts:
-        if x not in seen:
-            seen.add(x)
+        key = x.strip().lower()
+        if key not in seen:
+            seen.add(key)
             uniq.append(x)
-    return uniq[:45]
+
+    return uniq[:30]
 
 
 def fetch_news_all():
@@ -253,6 +241,7 @@ def get_today_events():
     today = now_teh.strftime("%Y-%m-%d")
     tomorrow = (now_teh + timedelta(days=1)).strftime("%Y-%m-%d")
     out = []
+
     for ev in data:
         if (
             ev.get("country") in ["USD", "EUR", "EMU"]
@@ -261,12 +250,14 @@ def get_today_events():
             d = ev.get("date", "")[:10]
             if d in [today, tomorrow]:
                 out.append(ev)
+
     return out
 
 
 # ---------- CALENDAR HELPERS ----------
 def impact_to_fa(impact):
     impact = (impact or "").strip().lower()
+
     if impact == "high":
         return "🔴 خیلی مهم"
     elif impact == "medium":
@@ -278,8 +269,10 @@ def impact_to_fa(impact):
 
 def parse_event_datetime(event):
     raw_date = (event.get("date") or "").strip()
+
     if not raw_date:
         return None
+
     try:
         dt = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
         if dt.tzinfo is None:
@@ -291,21 +284,27 @@ def parse_event_datetime(event):
 
 def event_time_tehran(event):
     dt = parse_event_datetime(event)
+
     if dt:
         teh = dt.astimezone(TEHRAN_TZ)
         return teh.strftime("%H:%M تهران")
+
     raw_time = event.get("time", "")
     if raw_time:
         return str(raw_time)
+
     return "زمان نامشخص"
 
 
 def is_event_today_tehran(event):
     dt = parse_event_datetime(event)
+
     if not dt:
         return True
+
     event_day = dt.astimezone(TEHRAN_TZ).date()
     today_tehran = datetime.now(TEHRAN_TZ).date()
+
     return event_day == today_tehran
 
 
@@ -313,164 +312,104 @@ def expected_event_impact(event):
     title = (event.get("title") or "").lower()
     country = (event.get("country") or "").upper()
 
-    if country == "USD" and any(
-        k in title for k in ["cpi", "inflation", "pce"]
-    ):
+    if country == "USD" and any(k in title for k in ["cpi", "inflation", "pce"]):
         return (
-            "اگر عدد تورم بالاتر از پیش‌بینی منتشر شود، "
-            "احتمال تقویت دلار بیشتر می‌شود و EUR/USD می‌تواند "
-            "فشار نزولی بگیرد. اگر عدد پایین‌تر باشد، دلار "
-            "می‌تواند تضعیف شود و EUR/USD حمایت بگیرد."
+            "اگر عدد تورم بالاتر از پیش‌بینی منتشر شود، احتمال تقویت دلار بیشتر می‌شود "
+            "و EUR/USD می‌تواند فشار نزولی بگیرد. اگر عدد پایین‌تر باشد، دلار می‌تواند "
+            "تضعیف شود و EUR/USD حمایت بگیرد."
         )
-    if country == "USD" and any(
-        k in title
-        for k in ["nfp", "nonfarm", "non-farm", "payroll",
-                   "employment change"]
-    ):
+
+    if country == "USD" and any(k in title for k in ["nfp", "nonfarm", "non-farm", "payroll", "employment change"]):
         return (
-            "عدد اشتغال قوی‌تر از پیش‌بینی معمولاً به نفع دلار "
-            "است و می‌تواند EUR/USD را تحت فشار بگذارد. عدد "
-            "ضعیف‌تر از پیش‌بینی معمولاً به ضرر دلار است."
+            "عدد اشتغال قوی‌تر از پیش‌بینی معمولاً به نفع دلار است و می‌تواند EUR/USD را "
+            "تحت فشار بگذارد. عدد ضعیف‌تر از پیش‌بینی معمولاً به ضرر دلار است."
         )
-    if country == "USD" and any(
-        k in title
-        for k in ["unemployment claims", "unemployment rate",
-                   "jobless claims", "initial jobless",
-                   "continuing claims", "claims"]
-    ):
+
+    if country == "USD" and any(k in title for k in [
+        "unemployment claims", "unemployment rate", "jobless claims",
+        "initial jobless", "continuing claims", "claims"
+    ]):
         return (
-            "عدد بالاتر از پیش‌بینی نشانه ضعف بازار کار است؛ "
-            "می‌تواند دلار را تضعیف کند. عدد پایین‌تر نشانه "
-            "بازار کار قوی‌تر است، می‌تواند دلار را تقویت کند."
+            "عدد بالاتر از پیش‌بینی نشانه ضعف بازار کار است و می‌تواند دلار را تضعیف کند. "
+            "عدد پایین‌تر نشانه بازار کار قوی‌تر است و می‌تواند دلار را تقویت کند."
         )
-    if country == "USD" and any(
-        k in title for k in ["average hourly earnings", "wages", "wage"]
-    ):
+
+    if country == "USD" and any(k in title for k in ["average hourly earnings", "wages", "wage"]):
         return (
-            "رشد دستمزد بالاتر از پیش‌بینی می‌تواند فشار تورمی "
-            "را بالا نگه دارد و به نفع دلار باشد."
+            "رشد دستمزد بالاتر از پیش‌بینی می‌تواند فشار تورمی را بالا نگه دارد و به نفع دلار باشد."
         )
-    if country == "USD" and any(
-        k in title
-        for k in ["fomc", "fed", "powell", "rate decision", "interest rate"]
-    ):
+
+    if country == "USD" and any(k in title for k in ["fomc", "fed", "powell", "rate decision", "interest rate"]):
         return (
-            "لحن هاوکیش فدرال رزرو معمولاً دلار را تقویت می‌کند. "
-            "لحن داویش می‌تواند دلار را تضعیف کند."
+            "لحن هاوکیش فدرال رزرو معمولاً دلار را تقویت می‌کند. لحن داویش می‌تواند دلار را تضعیف کند."
         )
-    if country == "USD" and any(
-        k in title
-        for k in ["retail sales", "gdp", "ism", "pmi",
-                   "durable goods", "consumer confidence"]
-    ):
+
+    if country == "USD" and any(k in title for k in [
+        "retail sales", "gdp", "ism", "pmi", "durable goods", "consumer confidence"
+    ]):
         return (
-            "عدد قوی‌تر از پیش‌بینی معمولاً دلار را تقویت می‌کند. "
-            "عدد ضعیف‌تر می‌تواند دلار را تضعیف کند."
+            "عدد قوی‌تر از پیش‌بینی معمولاً دلار را تقویت می‌کند. عدد ضعیف‌تر می‌تواند دلار را تضعیف کند."
         )
-    if country in ["EUR", "EMU"] and any(
-        k in title for k in ["cpi", "inflation", "hicp"]
-    ):
+
+    if country in ["EUR", "EMU"] and any(k in title for k in ["cpi", "inflation", "hicp"]):
         return (
-            "تورم بالاتر از پیش‌بینی می‌تواند احتمال لحن "
-            "هاوکیش‌تر ECB را بالا ببرد و به نفع یورو باشد."
+            "تورم بالاتر از پیش‌بینی می‌تواند احتمال لحن هاوکیش‌تر ECB را بالا ببرد و به نفع یورو باشد."
         )
-    if country in ["EUR", "EMU"] and any(
-        k in title
-        for k in ["ecb", "lagarde", "rate decision", "interest rate"]
-    ):
+
+    if country in ["EUR", "EMU"] and any(k in title for k in ["ecb", "lagarde", "rate decision", "interest rate"]):
         return (
-            "لحن هاوکیش ECB معمولاً به نفع یورو و صعود EUR/USD "
-            "است. لحن داویش ECB می‌تواند یورو را تضعیف کند."
+            "لحن هاوکیش ECB معمولاً به نفع یورو و صعود EUR/USD است. "
+            "لحن داویش ECB می‌تواند یورو را تضعیف کند."
         )
-    if country in ["EUR", "EMU"] and any(
-        k in title
-        for k in ["gdp", "pmi", "retail sales", "zew", "ifo",
-                   "employment", "unemployment"]
-    ):
+
+    if country in ["EUR", "EMU"] and any(k in title for k in [
+        "gdp", "pmi", "retail sales", "zew", "ifo", "employment", "unemployment"
+    ]):
         return (
-            "داده قوی‌تر از انتظار معمولاً به نفع یورو است. "
-            "داده ضعیف‌تر می‌تواند یورو را تحت فشار بگذارد."
+            "داده قوی‌تر از انتظار معمولاً به نفع یورو است. داده ضعیف‌تر می‌تواند یورو را تحت فشار بگذارد."
         )
-    return (
-        "این خبر می‌تواند روی احساسات بازار اثر بگذارد. "
-        "هنگام انتشار باید عدد واقعی با پیش‌بینی مقایسه شود."
-    )
+
+    return "این خبر می‌تواند روی احساسات بازار اثر بگذارد و باید actual با forecast مقایسه شود."
 
 
 def event_number(value):
-    m = re.search(
-        r'[-+]?\d+(?:\.\d+)?',
-        str(value or "").replace(",", "")
-    )
+    m = re.search(r"[-+]?\d+(?:\.\d+)?", str(value or "").replace(",", ""))
     return float(m.group()) if m else None
 
 
 def released_event_impact(event):
     title = (event.get("title") or "").lower()
     country = (event.get("country") or "").upper()
+
     actual = event_number(event.get("actual"))
     forecast = event_number(event.get("forecast"))
 
     if actual is None or forecast is None:
-        return (
-            "خبر منتشر شده، اما برای تحلیل دقیق باید عدد "
-            "واقعی با پیش‌بینی مقایسه شود."
-        )
+        return "خبر منتشر شده، اما برای تحلیل دقیق باید عدد واقعی با پیش‌بینی مقایسه شود."
+
     if actual == forecast:
-        return (
-            "عدد واقعی مطابق پیش‌بینی منتشر شد؛ "
-            "اثر اولیه روی EUR/USD خنثی است."
-        )
+        return "عدد واقعی مطابق پیش‌بینی منتشر شد؛ اثر اولیه روی EUR/USD خنثی است."
 
     higher = actual > forecast
 
-    if country == "USD" and any(
-        k in title
-        for k in ["unemployment claims", "jobless claims",
-                   "unemployment rate", "claims"]
-    ):
+    if country == "USD" and any(k in title for k in [
+        "unemployment claims", "jobless claims", "unemployment rate", "claims"
+    ]):
         if higher:
-            return (
-                "عدد بیکاری بالاتر از پیش‌بینی آمد؛ "
-                "این معمولاً دلار را تضعیف می‌کند و "
-                "برای EUR/USD صعودی است."
-            )
-        return (
-            "عدد بیکاری پایین‌تر از پیش‌بینی آمد؛ "
-            "این معمولاً دلار را تقویت می‌کند و "
-            "برای EUR/USD نزولی است."
-        )
+            return "عدد بیکاری بالاتر از پیش‌بینی آمد؛ این معمولاً دلار را تضعیف می‌کند و برای EUR/USD صعودی است."
+        return "عدد بیکاری پایین‌تر از پیش‌بینی آمد؛ این معمولاً دلار را تقویت می‌کند و برای EUR/USD نزولی است."
 
     if country == "USD":
         if higher:
-            return (
-                "عدد آمریکا قوی‌تر از پیش‌بینی آمد؛ "
-                "این معمولاً دلار را تقویت می‌کند و "
-                "برای EUR/USD نزولی است."
-            )
-        return (
-            "عدد آمریکا ضعیف‌تر از پیش‌بینی آمد؛ "
-            "این معمولاً دلار را تضعیف می‌کند و "
-            "برای EUR/USD صعودی است."
-        )
+            return "عدد آمریکا قوی‌تر از پیش‌بینی آمد؛ این معمولاً دلار را تقویت می‌کند و برای EUR/USD نزولی است."
+        return "عدد آمریکا ضعیف‌تر از پیش‌بینی آمد؛ این معمولاً دلار را تضعیف می‌کند و برای EUR/USD صعودی است."
 
     if country in ["EUR", "EMU"]:
         if higher:
-            return (
-                "عدد اروپا بهتر از پیش‌بینی آمد؛ "
-                "این معمولاً یورو را تقویت می‌کند و "
-                "برای EUR/USD صعودی است."
-            )
-        return (
-            "عدد اروپا ضعیف‌تر از پیش‌بینی آمد؛ "
-            "این معمولاً یورو را تضعیف می‌کند و "
-            "برای EUR/USD نزولی است."
-        )
+            return "عدد اروپا بهتر از پیش‌بینی آمد؛ این معمولاً یورو را تقویت می‌کند و برای EUR/USD صعودی است."
+        return "عدد اروپا ضعیف‌تر از پیش‌بینی آمد؛ این معمولاً یورو را تضعیف می‌کند و برای EUR/USD نزولی است."
 
-    return (
-        "خبر منتشر شد؛ اثر آن باید در کنار "
-        "واکنش دلار و یورو بررسی شود."
-    )
+    return "خبر منتشر شد و اثر آن باید در کنار واکنش دلار و یورو بررسی شود."
 
 
 # ---------- MORNING ALERT ----------
@@ -488,30 +427,28 @@ def build_morning_calendar_alert(calendar_events):
     events = []
     for ev in calendar_events:
         impact = (ev.get("impact") or "").strip().lower()
+
         if impact not in allowed_impacts:
             continue
+
         if not is_event_today_tehran(ev):
             continue
+
         events.append(ev)
 
     if not events:
-        parts = [
+        return "\n".join([
             "🌅 یادآور اقتصادی امروز EUR/USD",
             "",
             date_fa,
             "",
-            "امروز برای EUR/USD خبر High یا Medium مهمی "
-            "در تقویم ثبت نشده است.",
+            "امروز برای EUR/USD خبر High یا Medium مهمی در تقویم ثبت نشده است.",
             "",
-            "با این حال بازار می‌تواند به تیترهای ناگهانی "
-            "Fed، ECB، دلار، اوراق آمریکا و فضای ریسک جهانی "
-            "واکنش نشان دهد.",
+            "با این حال بازار می‌تواند به تیترهای ناگهانی Fed، ECB، دلار، اوراق آمریکا و فضای ریسک جهانی واکنش نشان دهد.",
             "",
             "⚠️ نکته:",
-            "حتی در روزهای بدون خبر قرمز، سخنرانی‌های ناگهانی "
-            "یا تیترهای ژئوپلیتیک می‌توانند نوسان ایجاد کنند.",
-        ]
-        return "\n".join(parts)
+            "حتی در روزهای بدون خبر قرمز، سخنرانی‌های ناگهانی یا تیترهای ژئوپلیتیک می‌توانند نوسان ایجاد کنند.",
+        ])
 
     def sort_key(ev):
         dt = parse_event_datetime(ev)
@@ -520,14 +457,15 @@ def build_morning_calendar_alert(calendar_events):
         return datetime.max.replace(tzinfo=TEHRAN_TZ)
 
     events = sorted(events, key=sort_key)
-    lines = []
 
+    lines = []
     for ev in events:
         country = ev.get("country", "")
         title = ev.get("title", "")
         impact = ev.get("impact", "")
         forecast = ev.get("forecast", "")
         previous = ev.get("previous", "")
+
         time_fa = event_time_tehran(ev)
         impact_fa = impact_to_fa(impact)
         effect = expected_event_impact(ev)
@@ -539,18 +477,22 @@ def build_morning_calendar_alert(calendar_events):
             f"🌍 ارز: {country}",
             f"📌 خبر: {title}",
         ]
+
         if forecast:
             block_parts.append(f"📊 پیش‌بینی: {forecast}")
+
         if previous:
             block_parts.append(f"📉 قبلی: {previous}")
+
         block_parts.extend([
             "",
             "اثر احتمالی روی EUR/USD:",
             effect,
         ])
+
         lines.append("\n".join(block_parts))
 
-    parts = [
+    return "\n".join([
         "🌅 یادآور اقتصادی امروز EUR/USD",
         "",
         date_fa,
@@ -560,63 +502,56 @@ def build_morning_calendar_alert(calendar_events):
         "\n\n".join(lines),
         "",
         "⚠️ هشدار مدیریت ریسک",
-        "نزدیک زمان خبرهای قرمز و نارنجی، احتمال افزایش "
-        "نوسان وجود دارد. قبل از انتشار داده از تصمیم "
-        "عجولانه پرهیز شود.",
-    ]
-    return "\n".join(parts)
+        "نزدیک زمان خبرهای قرمز و نارنجی، احتمال افزایش نوسان وجود دارد. "
+        "قبل از انتشار داده از تصمیم عجولانه پرهیز شود.",
+    ])
 
 
-# ---------- LIVE NEWS CHECKER ----------
+# ---------- LIVE NEWS ----------
 def check_live_news():
     """
-    چک تقویم اقتصادی – فقط خبرهایی که actual جدید دارند
-    و قبلاً ارسال نشده‌اند
+    چک خبرهای تقویمی منتشرشده
     """
-    seen_events = load_seen_set(SEEN_EVENTS_FILE)
+    hits = []
+
     try:
         data = fetch_calendar_full()
-        now_teh = datetime.now(timezone.utc) + timedelta(
-            hours=3, minutes=30
-        )
+        now_teh = datetime.now(timezone.utc) + timedelta(hours=3, minutes=30)
         today = now_teh.strftime("%Y-%m-%d")
-        hits = []
+        seen_ids = set()
 
         for ev in data:
             if ev.get("country") not in ["USD", "EUR", "EMU"]:
                 continue
+
             if ev.get("impact") not in ("High", "Medium"):
                 continue
+
             if ev.get("date", "")[:10] != today:
                 continue
+
             actual = (ev.get("actual") or "").strip()
             if not actual:
                 continue
 
-            uid = hashlib.md5(
-                f"{ev.get('title')}_{ev.get('date')}_{ev.get('time')}"
-                .encode()
-            ).hexdigest()
-
-            if uid in seen_events:
+            uid = f"{ev.get('title')}_{ev.get('date')}_{ev.get('time')}"
+            if uid in seen_ids:
                 continue
-
-            seen_events.add(uid)
+            seen_ids.add(uid)
 
             item = {
-                "title":    ev.get("title", ""),
-                "country":  ev.get("country", ""),
-                "actual":   ev.get("actual", ""),
+                "title": ev.get("title", ""),
+                "country": ev.get("country", ""),
+                "actual": ev.get("actual", ""),
                 "forecast": ev.get("forecast", ""),
                 "previous": ev.get("previous", ""),
-                "time":     ev.get("time", ""),
+                "time": ev.get("time", ""),
             }
+
             item["instant_impact"] = released_event_impact(item)
             hits.append(item)
 
-        save_seen_set(SEEN_EVENTS_FILE, seen_events)
         return hits
-
     except Exception as ex:
         print("check_live_news error:", ex)
         return []
@@ -624,36 +559,36 @@ def check_live_news():
 
 def check_breaking_headlines():
     """
-    چک تیترهای فوری بلومبرگ و FXStreet
-    فقط تیترهای جدیدی که قبلاً ارسال نشده‌اند
+    چک تیترهای فوری مرتبط
     """
-    seen_headlines = load_seen_set(SEEN_HEADLINES_FILE)
     try:
         urls = [
             "https://www.fxstreet.com/news/forex/feed",
             "https://feeds.bloomberg.com/markets/news.rss",
             "https://www.forexlive.com/feed/",
         ]
+
         hits = []
-        keywords = [
-            "eurusd", "eur/usd", "euro dollar", "ecb", "fed",
-            "lagarde", "warsh", "cpi", "nfp", "eurozone",
-        ]
+        seen = set()
+
         for u in urls:
             try:
                 d = feedparser.parse(u)
                 for e in d.entries[:5]:
-                    title = getattr(e, "title", "").lower()
-                    h = hashlib.md5(title.encode()).hexdigest()
-                    if h in seen_headlines:
+                    title = clean_html_text(getattr(e, "title", ""))
+                    low = title.lower()
+
+                    if not is_relevant_news(title):
                         continue
-                    if any(k in title for k in keywords):
-                        seen_headlines.add(h)
-                        hits.append(title)
+
+                    if low in seen:
+                        continue
+                    seen.add(low)
+
+                    hits.append(title)
             except Exception:
                 pass
 
-        save_seen_set(SEEN_HEADLINES_FILE, seen_headlines)
         return hits[:3]
     except Exception:
         return []
@@ -661,25 +596,84 @@ def check_breaking_headlines():
 
 # ---------- SCORING ----------
 def score_sentiment(text):
-    low = text.lower()
-    bull = sum(low.count(k) for k in BULLISH)
-    bear = sum(low.count(k) for k in BEARISH)
-    if "=== bloomberg ===" in low:
-        try:
-            bloom = low.split("=== bloomberg ===")[1].split("===")[0]
-            bull += sum(bloom.count(k) for k in BULLISH) // 2
-            bear += sum(bloom.count(k) for k in BEARISH) // 2
-        except Exception:
-            pass
+    """
+    امتیازدهی سبک‌تر و دقیق‌تر
+    """
+    lines = [
+        x.strip().lower()
+        for x in str(text or "").splitlines()
+        if x.strip() and not x.strip().startswith("===")
+    ]
+
+    bull = 0
+    bear = 0
+
+    for line in lines:
+        bull += sum(1 for k in BULLISH if k in line)
+        bear += sum(1 for k in BEARISH if k in line)
+
     return bull, bear
 
 
 # ---------- BUILDERS ----------
-def build_currency_strength(
-    bull, bear, calendar_events=None, breaking_news=None
-):
-    eur_score = int(bull)
-    usd_score = int(bear)
+def build_timeframe_view(bull, bear, calendar_events=None, breaking_news=None):
+    diff = int(bull) - int(bear)
+    calendar_events = calendar_events or []
+
+    high_events = [
+        ev for ev in calendar_events
+        if (ev.get("impact") or "").lower() == "high"
+    ]
+    medium_events = [
+        ev for ev in calendar_events
+        if (ev.get("impact") or "").lower() == "medium"
+    ]
+
+    if breaking_news:
+        instant = "بازار در حال واکنش به خبر تازه منتشرشده است و جهت لحظه‌ای باید با actual نسبت به forecast سنجیده شود."
+    elif diff >= 2:
+        instant = "متمایل به صعود EUR/USD؛ فشار خبری فعلی بیشتر علیه دلار یا به نفع یورو است."
+    elif diff <= -2:
+        instant = "متمایل به نزول EUR/USD؛ جریان خبری فعلی بیشتر به نفع دلار یا علیه یورو است."
+    else:
+        instant = "خنثی تا رنج؛ بازار فعلاً سیگنال لحظه‌ای قوی ندارد."
+
+    if high_events:
+        today_view = "امروز بازار زیر سایه خبرهای قرمز است و تا قبل از انتشار داده‌های مهم، احتیاط محتمل‌تر است."
+    elif medium_events:
+        today_view = "امروز خبرهای نارنجی می‌توانند جهت کوتاه‌مدت بدهند، اما برای روند قوی نیاز به تأیید بیشتر است."
+    else:
+        today_view = "امروز از نظر تقویم فشار خبری سنگین دیده نمی‌شود و تیترهای Fed، ECB و احساسات ریسک مهم‌تر می‌شوند."
+
+    if diff >= 4:
+        long_term = "در نمای کلان، اگر ضعف دلار ادامه پیدا کند، EUR/USD می‌تواند حمایت بنیادی بیشتری بگیرد."
+    elif diff <= -4:
+        long_term = "در نمای کلان، برتری نسبی دلار فعلاً پررنگ‌تر است و فشار روی EUR/USD ممکن است باقی بماند."
+    else:
+        long_term = "دید بلندمدت فعلاً خنثی است و مسیر اصلی به تفاوت سیاست‌های Fed و ECB بستگی دارد."
+
+    return "\n".join([
+        "📌 جمع‌بندی چندزمانه:",
+        "",
+        f"• لحظه‌ای: {instant}",
+        "",
+        f"• امروز: {today_view}",
+        "",
+        f"• بلندمدت: {long_term}",
+    ])
+
+
+def build_currency_strength(bull, bear, calendar_events=None, breaking_news=None):
+    def clamp_score(x):
+        x = int(x)
+        if x < 0:
+            return 0
+        if x > 10:
+            return 10
+        return x
+
+    eur_score = clamp_score(bull)
+    usd_score = clamp_score(bear)
     calendar_events = calendar_events or []
 
     high_count = sum(
@@ -698,179 +692,37 @@ def build_currency_strength(
         risk_level = "متوسط"
 
     if breaking_news:
-        bn = (
-            breaking_news[0]
-            if isinstance(breaking_news, list)
-            else breaking_news
-        )
+        bn = breaking_news[0] if isinstance(breaking_news, list) else breaking_news
         impact_text = str(bn.get("instant_impact", ""))
+
         if "صعودی" in impact_text:
-            eur_score += 3
+            eur_score = min(10, eur_score + 2)
         elif "نزولی" in impact_text:
-            usd_score += 3
+            usd_score = min(10, usd_score + 2)
 
     diff = eur_score - usd_score
 
-    if diff >= 5:
-        result = (
-            "برتری فعلی با یورو است؛ "
-            "فشار بنیادی بیشتر به سمت صعود EUR/USD است."
-        )
-    elif diff <= -5:
-        result = (
-            "برتری فعلی با دلار است؛ "
-            "فشار بنیادی بیشتر به سمت نزول EUR/USD است."
-        )
-    elif diff > 0:
-        result = "یورو کمی برتری دارد، اما اختلاف هنوز قوی نیست."
-    elif diff < 0:
-        result = "دلار کمی برتری دارد، اما اختلاف هنوز قوی نیست."
-    else:
-        result = (
-            "قدرت یورو و دلار تقریباً برابر است؛ "
-            "بازار حالت خنثی دارد."
-        )
-
-    parts = [
-        "⚖️ قدرت نسبی ارزها:",
-        "",
-        f"• قدرت EUR: {eur_score}",
-        f"• قدرت USD: {usd_score}",
-        f"• ریسک تقویم امروز: {risk_level}",
-        "",
-        "نتیجه:",
-        result,
-    ]
-    return "\n".join(parts)
-
-
-def build_timeframe_view(
-    bull, bear, calendar_events=None, breaking_news=None
-):
-    diff = bull - bear
-    calendar_events = calendar_events or []
-
-    high_events = [
-        ev for ev in calendar_events
-        if (ev.get("impact") or "").lower() == "high"
-    ]
-    medium_events = [
-        ev for ev in calendar_events
-        if (ev.get("impact") or "").lower() == "medium"
-    ]
-
-    if breaking_news:
-        instant = (
-            "بازار در حال واکنش به خبر تازه منتشرشده است؛ "
-            "جهت لحظه‌ای باید با actual نسبت به forecast "
-            "سنجیده شود."
-        )
-    elif diff >= 3:
-        instant = (
-            "متمایل به صعود EUR/USD؛ "
-            "فشار خبری فعلی بیشتر علیه دلار یا به نفع یورو است."
-        )
+    if diff >= 3:
+        result = "برتری فعلی با یورو است."
     elif diff <= -3:
-        instant = (
-            "متمایل به نزول EUR/USD؛ "
-            "جریان خبری فعلی بیشتر به نفع دلار یا علیه یورو است."
-        )
+        result = "برتری فعلی با دلار است."
+    elif diff > 0:
+        result = "یورو کمی برتری دارد."
+    elif diff < 0:
+        result = "دلار کمی برتری دارد."
     else:
-        instant = (
-            "خنثی تا رنج؛ "
-            "بازار فعلاً سیگنال لحظه‌ای قوی ندارد."
-        )
+        result = "قدرت یورو و دلار تقریباً برابر است."
 
-    if high_events:
-        today_view = (
-            "امروز بازار زیر سایه خبرهای قرمز است؛ "
-            "تا قبل از انتشار داده‌های مهم، احتیاط محتمل‌تر است."
-        )
-    elif medium_events:
-        today_view = (
-            "امروز خبرهای نارنجی می‌توانند جهت کوتاه‌مدت بدهند، "
-            "اما برای روند قوی نیاز به تأیید بانک‌های مرکزی است."
-        )
-    else:
-        today_view = (
-            "امروز از نظر تقویم فشار خبری سنگین دیده نمی‌شود؛ "
-            "تیترهای Fed، ECB و احساسات ریسک جهانی مهم‌تر می‌شوند."
-        )
-
-    if diff >= 6:
-        long_term = (
-            "در نمای کلان، اگر ضعف دلار ادامه پیدا کند، "
-            "EUR/USD می‌تواند حمایت بنیادی بیشتری بگیرد."
-        )
-    elif diff <= -6:
-        long_term = (
-            "در نمای کلان، برتری نسبی دلار فعلاً پررنگ‌تر است؛ "
-            "فشار روی EUR/USD ممکن است باقی بماند."
-        )
-    else:
-        long_term = (
-            "دید بلندمدت فعلاً خنثی است؛ مسیر اصلی به تفاوت "
-            "سیاست‌های Fed و ECB بستگی دارد."
-        )
-
-    parts = [
-        "📌 جمع‌بندی چندزمانه:",
-        "",
-        f"• لحظه‌ای: {instant}",
-        "",
-        f"• امروز: {today_view}",
-        "",
-        f"• بلندمدت: {long_term}",
-    ]
-    return "\n".join(parts)
+    return "\n".join([
+        "⚖️ قدرت نسبی ارزها:",
+        f"• قدرت EUR: {eur_score}/10",
+        f"• قدرت USD: {usd_score}/10",
+        f"• ریسک تقویم امروز: {risk_level}",
+        f"• جمع‌بندی: {result}",
+    ])
 
 
-def build_market_narrative(cal_events, bull, bear):
-    try:
-        titles = ""
-        if cal_events:
-            tmp = []
-            for e in cal_events:
-                try:
-                    tmp.append(str(e.get("title", "")))
-                except Exception:
-                    pass
-            titles = " ".join(tmp).upper()
-
-        focus = "بدون خبر مهم امروز"
-        if "CPI" in titles or "PCE" in titles:
-            focus = "تورم"
-        elif "NFP" in titles or "EMPLOYMENT" in titles:
-            focus = "اشتغال"
-        elif "FED" in titles or "FOMC" in titles:
-            focus = "فدرال رزرو"
-        elif "ECB" in titles:
-            focus = "بانک مرکزی اروپا"
-        elif "GDP" in titles:
-            focus = "رشد اقتصادی"
-
-        status = "بازار در انتظار"
-        b = int(bull)
-        be = int(bear)
-        if b > be + 15:
-            status = "تمایل صعودی به نفع یورو"
-        elif be > b + 15:
-            status = "تمایل نزولی به نفع دلار"
-
-        parts = [
-            "📖 روایت بازار:",
-            f"- تمرکز بازار: {focus}",
-            f"- وضعیت: {status}",
-        ]
-        return "\n".join(parts)
-    except Exception as ex:
-        return f"📖 روایت بازار:\n- خطای داخلی: {str(ex)[:60]}"
-
-
-def build_brief(
-    news_text, bull, bear, calendar_events,
-    slot_label="تحلیل روزانه", breaking_news=None
-):
+def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل روزانه", breaking_news=None):
     now_utc = datetime.now(timezone.utc)
     teh = now_utc + timedelta(hours=3, minutes=30)
 
@@ -884,141 +736,101 @@ def build_brief(
 
     diff = int(bull) - int(bear)
 
-    if diff >= 3:
+    if diff >= 2:
         direction = "صعودی"
         bias = "خرید در اصلاح"
         emoji = "🟢"
-        conf = "متوسط به بالا"
-    elif diff <= -3:
+        conf = "متوسط"
+    elif diff <= -2:
         direction = "نزولی"
         bias = "فروش در رشد"
         emoji = "🔴"
-        conf = "متوسط به بالا"
-    elif diff >= 1:
-        direction = "خنثی متمایل به صعود"
-        bias = "رنج صعودی"
-        emoji = "🟡"
-        conf = "متوسط"
-    elif diff <= -1:
-        direction = "خنثی متمایل به نزول"
-        bias = "رنج نزولی"
-        emoji = "🟡"
         conf = "متوسط"
     else:
-        direction = "خنثی / رنج"
-        bias = "انتظار داده"
-        emoji = "⚪"
+        direction = "خنثی"
+        bias = "انتظار برای داده مهم"
+        emoji = "🟡"
         conf = "پایین"
 
     breaking_block = ""
     if breaking_news:
-        bn = (
-            breaking_news[0]
-            if isinstance(breaking_news, list)
-            else breaking_news
-        )
-        impact_text = (
-            bn.get("instant_impact") or released_event_impact(bn)
-        )
+        bn = breaking_news[0] if isinstance(breaking_news, list) else breaking_news
+        impact_text = bn.get("instant_impact") or released_event_impact(bn)
+
         breaking_block = "\n".join([
             "🚨 خبر فوری:",
             f"{bn.get('country', '')} - {bn.get('title', '')}",
-            (
-                f"واقعی: {bn.get('actual', '')} | "
-                f"پیش‌بینی: {bn.get('forecast', '')} | "
-                f"قبلی: {bn.get('previous', '')}"
-            ),
-            f"نظر فوری: {impact_text}",
+            f"واقعی: {bn.get('actual', '')} | پیش‌بینی: {bn.get('forecast', '')}",
+            f"اثر فوری: {impact_text}",
+            ""
         ])
 
-    sentences = re.split(r'[\.\n]', news_text or "")
+    sentences = re.split(r"[\.\n]", news_text or "")
     keys = []
-    all_kw = (
-        BULLISH + BEARISH
-        + ["ecb", "fed", "lagarde", "cpi", "pce", "nfp",
-           "dollar", "euro", "inflation"]
-    )
+    seen = set()
+
+    all_kw = [
+        "ecb", "fed", "lagarde", "powell", "cpi", "pce", "nfp",
+        "payroll", "inflation", "dollar", "euro", "eur/usd", "yield", "dxy"
+    ]
 
     for s in sentences:
-        s_clean = s.strip()
+        s_clean = clean_html_text(s.strip())
         s_low = s_clean.lower()
-        if (
-            any(k in s_low for k in all_kw)
-            and 30 < len(s_clean) < 220
-        ):
-            s_clean = re.sub(r'\b1\.\d{3,5}\b', 'سطح قیمتی', s_clean)
-            s_clean = re.sub(r'\$\d+[\.\d]*', 'قیمت', s_clean)
-            if s_clean not in keys:
+
+        if any(k in s_low for k in all_kw) and 35 < len(s_clean) < 180:
+            key = s_low[:120]
+            if key not in seen:
+                seen.add(key)
                 keys.append(s_clean)
-        if len(keys) >= 4:
+
+        if len(keys) >= 3:
             break
 
     if not keys:
         keys = [
-            "در منابع خبری فعلی، تیتر قوی برای جهت‌دهی "
-            "بازار دیده نشد.",
-            "بازار ممکن است تا انتشار داده‌های مهم بعدی "
-            "در حالت احتیاط باقی بماند.",
-            "واکنش دلار، یورو و لحن بانک‌های مرکزی "
-            "برای ادامه مسیر مهم است.",
+            "خبر مستقیم مهم برای EUR/USD در منابع فعلی محدود است.",
+            "جهت بازار بیشتر به تیترهای دلار و بانک‌های مرکزی وابسته است.",
         ]
 
-    bullets = "\n".join([f"- {k[:180]}" for k in keys[:4]])
+    bullets = "\n".join([f"- {k}" for k in keys[:3]])
 
     if calendar_events:
         cal_lines = []
-        for ev in calendar_events[:5]:
-            tm = ev.get("time", ev.get("date", ""))
+        for ev in calendar_events[:3]:
+            tm = event_time_tehran(ev)
             ct = ev.get("country", "")
             ttl = ev.get("title", "")
             impact = ev.get("impact", "")
-            fc = ev.get("forecast", "")
-            line = f"- {tm} | {ct} | {impact} | {ttl}"
-            if fc:
-                line += f" | پیش‌بینی: {fc}"
-            cal_lines.append(line)
-        calendar_text = (
-            "\n".join(cal_lines) if cal_lines
-            else "امروز رویداد مهمی ثبت نشده است."
-        )
+            cal_lines.append(f"- {tm} | {ct} | {impact} | {ttl}")
+        calendar_text = "\n".join(cal_lines)
     else:
-        calendar_text = (
-            "امروز رویداد High یا Medium مهمی ثبت نشده است."
-        )
+        calendar_text = "امروز خبر مهم تقویمی برای EUR/USD دیده نمی‌شود."
 
     try:
-        timeframe_view = build_timeframe_view(
-            bull, bear, calendar_events, breaking_news
-        )
+        timeframe_view = build_timeframe_view(bull, bear, calendar_events, breaking_news)
     except Exception:
-        timeframe_view = "جمع‌بندی چندزمانه فعلاً در دسترس نیست."
+        timeframe_view = "جمع‌بندی چندزمانه در دسترس نیست."
 
     try:
-        currency_strength = build_currency_strength(
-            bull, bear, calendar_events, breaking_news
-        )
+        currency_strength = build_currency_strength(bull, bear, calendar_events, breaking_news)
     except Exception:
-        currency_strength = "قدرت نسبی ارزها فعلاً در دسترس نیست."
+        currency_strength = "قدرت نسبی ارزها در دسترس نیست."
 
-    try:
-        market_narrative = build_market_narrative(
-            calendar_events, bull, bear
-        )
-    except Exception as e:
-        market_narrative = f"📖 روایت بازار: خطا - {str(e)[:80]}"
+    bull_show = min(int(bull), 10)
+    bear_show = min(int(bear), 10)
 
     msg_parts = [
         f"{emoji} تحلیل فاندامنتال EUR/USD - {slot_label}",
-        "",
         date_fa,
         "",
     ]
 
     if breaking_block:
-        msg_parts.extend([breaking_block, ""])
+        msg_parts.append(breaking_block)
 
     msg_parts.extend([
-        f"جهت فاندامنتال: {direction}",
+        f"جهت: {direction}",
         f"تمایل: {bias}",
         f"اطمینان: {conf}",
         "",
@@ -1026,40 +838,92 @@ def build_brief(
         "",
         currency_strength,
         "",
-        "📰 خلاصه منابع:",
+        "📰 نکات کلیدی:",
         bullets,
         "",
-        "📅 تقویم اقتصادی امروز/فردا:",
+        "📅 تقویم اقتصادی:",
         calendar_text,
         "",
-        "🏦 بانک‌های مرکزی:",
-        "- ECB: وضعیت بانک مرکزی اروپا بر اساس "
-        "خبرهای امروز بررسی می‌شود.",
-        "- Fed: وضعیت فدرال رزرو بر اساس داده‌های "
-        "آمریکا بررسی می‌شود.",
+        f"جمع‌بندی نهایی: تمایل فعلی بازار {direction} است، اما واکنش به خبرهای جدید تعیین‌کننده خواهد بود.",
         "",
-        f"نتیجه: جهت کوتاه‌مدت {direction} است. "
-        "مدیریت ریسک ضروری است.",
-        "",
-        market_narrative,
-        "",
-        f"@EURUSD_Fa_Bot | {date_short}",
-        f"امتیاز خبری: صعودی {bull} / نزولی {bear}",
+        f"@EURUSDFaBot | {date_short}",
+        f"امتیاز خبری: صعودی {bull_show} / نزولی {bear_show}",
     ])
 
     msg = "\n".join(msg_parts)
 
     voice_parts = [
         f"تحلیل فاندامنتال یورو دلار، {date_short}، {slot_label}.",
-        f"جهت امروز: {direction}. اطمینان: {conf}.",
-        "بانک مرکزی اروپا بر اساس خبرهای امروز بررسی می‌شود.",
-        "فدرال رزرو بر اساس داده‌های آمریکا بررسی می‌شود.",
-        "بازار ممکن است نوسانی باشد. با مدیریت ریسک معامله کنید.",
+        f"جهت فعلی بازار {direction} است.",
+        "نکته اصلی، واکنش دلار و خبرهای مهم اقتصادی است.",
+        "با مدیریت ریسک معامله کنید."
     ]
     voice_text = "\n".join(voice_parts)
-    voice_text = re.sub(r'\b1\.\d{3,5}\b', '', voice_text)
 
     return msg, voice_text
+
+
+def ai_analyze(news_text, calendar_events, bull_score, bear_score):
+    """تحلیل هوشمند کوتاه و غیرتکراری با Groq AI"""
+    if not HAS_GROQ:
+        return None
+
+    try:
+        cal_summary = ""
+        if calendar_events:
+            for ev in calendar_events[:3]:
+                cal_summary += (
+                    f"- {ev.get('country','')}: {ev.get('title','')} "
+                    f"(پیش‌بینی: {ev.get('forecast','N/A')})\n"
+                )
+
+        prompt = f"""
+تو تحلیل‌گر حرفه‌ای EUR/USD هستی.
+
+فقط بر اساس خبرهای مرتبط با EUR/USD تحلیل کن.
+اگر خبر مستقیم مهم کم بود، صریح بگو: «خبر مستقیم مهم برای EUR/USD محدود است».
+
+قواعد:
+- حداکثر 120 کلمه
+- بدون تکرار متن اصلی
+- فقط 4 خط کوتاه
+- بدون قیمت
+- بدون مقدمه اضافی
+
+اخبار:
+{news_text[:2200]}
+
+تقویم:
+{cal_summary if cal_summary else "رویداد مهمی ثبت نشده"}
+
+امتیاز:
+صعودی={bull_score} | نزولی={bear_score}
+
+خروجی دقیقاً شامل این 4 بخش باشد:
+- جهت کلی:
+- عامل اصلی:
+- ریسک امروز:
+- جمع‌بندی:
+"""
+
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "تو تحلیل‌گر فاندامنتال فارکس هستی و خیلی کوتاه و دقیق فارسی می‌نویسی."
+                },
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.4,
+            max_tokens=300,
+        )
+
+        return response.choices[0].message.content.strip()
+
+    except Exception as ex:
+        print("AI analyze error:", ex)
+        return None
 
 
 # ---------- TELEGRAM ----------
@@ -1078,13 +942,14 @@ def send_telegram_text(text):
         chunks = []
         while text:
             chunk = text[:max_len]
-            last_newline = chunk.rfind('\n')
+            last_newline = chunk.rfind("\n")
             if last_newline > max_len // 2:
                 chunk = chunk[:last_newline]
             chunks.append(chunk)
             text = text[len(chunk):].lstrip()
 
     all_ok = True
+
     for i, chunk in enumerate(chunks):
         try:
             r = requests.post(
@@ -1097,10 +962,8 @@ def send_telegram_text(text):
                 },
                 timeout=20,
             )
-            print(
-                f"Telegram text part {i+1}/{len(chunks)}:",
-                r.status_code
-            )
+            print(f"Telegram text part {i+1}/{len(chunks)}:", r.status_code)
+
             if not r.ok:
                 all_ok = False
                 r2 = requests.post(
@@ -1115,6 +978,7 @@ def send_telegram_text(text):
                 print(f"Retry without markdown: {r2.status_code}")
                 if r2.ok:
                     all_ok = True
+
         except Exception as ex:
             print(f"Send error: {ex}")
             all_ok = False
@@ -1125,39 +989,44 @@ def send_telegram_text(text):
 def send_telegram_voice(text_fa):
     if not SEND_VOICE:
         return False
+
     audio_path = None
+
     try:
         try:
             import edge_tts
             import asyncio
             import tempfile
+
             voice = os.getenv("VOICE_NAME", VOICE_NAME)
 
             async def _synth():
                 communicate = edge_tts.Communicate(
-                    text_fa, voice,
+                    text_fa,
+                    voice,
                     rate=VOICE_RATE,
                     pitch=VOICE_PITCH,
                 )
-                with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=".mp3"
-                ) as tf:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tf:
                     out_path = tf.name
                 await communicate.save(out_path)
                 return out_path
 
             audio_path = asyncio.run(_synth())
+
         except Exception as e_edge:
             print("edge-tts failed, fallback gTTS:", e_edge)
             from gtts import gTTS
             import tempfile
-            tts = gTTS(text=text_fa, lang='fa', slow=False)
+
+            tts = gTTS(text=text_fa, lang="fa", slow=False)
             fd, audio_path = tempfile.mkstemp(suffix=".mp3")
             os.close(fd)
             tts.save(audio_path)
 
         if TELEGRAM_TOKEN.startswith("PUT_"):
             print(f"[VOICE DRY RUN] saved {audio_path}")
+            print(text_fa)
             return True
 
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendAudio"
@@ -1167,17 +1036,20 @@ def send_telegram_voice(text_fa):
                 data={
                     "chat_id": CHAT_ID,
                     "title": "EUR/USD FA – Persian",
-                    "performer": "EURUSD_Fa_Bot",
+                    "performer": "EURUSDFaBot",
                     "caption": "تحلیل صوتی – بدون قیمت",
                 },
                 files={"audio": f},
                 timeout=30,
             )
+
         print("Telegram voice:", r.status_code)
         return r.ok
+
     except Exception as ex:
         print("Voice error:", ex)
         return False
+
     finally:
         try:
             if audio_path and os.path.exists(audio_path):
@@ -1193,7 +1065,6 @@ def run_once(slot="manual"):
         try:
             hits = check_live_news()
 
-            # اگر خبر تقویمی جدید نبود، headline چک کن
             if not hits:
                 headlines = check_breaking_headlines()
                 if headlines:
@@ -1205,40 +1076,46 @@ def run_once(slot="manual"):
                             "forecast": "-",
                             "previous": "-",
                             "time": "now",
-                            "instant_impact": (
-                                "تیتر فوری دریافت شد؛ "
-                                "واکنش بازار باید بررسی شود."
-                            ),
+                            "instant_impact": "تیتر فوری دریافت شد؛ واکنش بازار باید بررسی شود.",
                         }
                         for h in headlines
                     ]
 
             if hits:
-                print(f"[watch] {len(hits)} new event(s) found. Sending...")
+                print(f"[watch] {len(hits)} event(s) found. Sending...")
                 news = fetch_news_all()
                 breaking_text = "\n".join([
-                    f"{h['country']} {h['title']} "
-                    f"Actual {h['actual']} Forecast {h['forecast']}"
+                    f"{h['country']} {h['title']} Actual {h['actual']} Forecast {h['forecast']}"
                     for h in hits
                 ])
                 news = breaking_text + "\n" + news
+
                 bull, bear = score_sentiment(news)
                 cal = get_today_events()
+
                 text_msg, voice_text = build_brief(
-                    news, bull, bear, cal,
+                    news_text=news,
+                    bull=bull,
+                    bear=bear,
+                    calendar_events=cal,
                     slot_label="🔔 خبر فوری – آپدیت آنی",
                     breaking_news=hits,
                 )
+
                 send_telegram_text(text_msg)
+
                 if SEND_VOICE:
                     send_telegram_voice(voice_text)
             else:
-                print("[watch] No new events. Silent exit.")
+                print("[watch] No new relevant events. Silent exit.")
+
         except Exception as e:
             print(f"[watch] Error: {e}")
+
         return
 
     print(f"[{slot}] Fetching news...")
+
     news = fetch_news_all()
     cal = get_today_events()
     bull, bear = score_sentiment(news)
@@ -1246,7 +1123,7 @@ def run_once(slot="manual"):
     slot_info = SCHEDULES.get(slot, SCHEDULES["manual"])
     slot_label = slot_info.get("label", slot)
 
-    if slot in ["morning", "manual"]:
+    if slot == "morning":
         try:
             calendar_msg = build_morning_calendar_alert(cal)
             send_telegram_text(calendar_msg)
@@ -1262,13 +1139,13 @@ def run_once(slot="manual"):
     )
 
     ai_analysis = ai_analyze(news, cal, bull, bear)
+
     if ai_analysis:
         text_msg = "\n".join([
             text_msg,
             "",
             "🤖 تحلیل هوش مصنوعی:",
-            "",
-            str(ai_analysis),
+            ai_analysis,
         ])
 
     if send_telegram_text(text_msg):
@@ -1283,6 +1160,7 @@ def run_once(slot="manual"):
                 "این تحلیل صرفاً اطلاع‌رسانی است.",
                 "با مدیریت ریسک معامله کنید.",
             ])
+
         if send_telegram_voice(voice_text):
             print("Voice sent successfully")
         else:
@@ -1292,16 +1170,21 @@ def run_once(slot="manual"):
 # ---------- MAIN ----------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="EUR/USD FA Persian Telegram Bot v3"
+        description="EUR/USD FA Persian Telegram Bot"
     )
     parser.add_argument(
         "--slot",
         choices=[
-            "morning", "news_morning", "us_preopen",
-            "evening", "manual", "watch",
+            "morning",
+            "news_morning",
+            "us_preopen",
+            "evening",
+            "manual",
+            "watch",
         ],
         default="manual",
     )
     args = parser.parse_args()
+
     slot = args.slot if args.slot else "manual"
     run_once(slot)
