@@ -657,32 +657,32 @@ def build_timeframe_view(bull, bear, calendar_events=None, breaking_news=None):
 def build_market_narrative(cal_events, bull, bear):
     try:
         titles = ""
-    if cal_events:
+        if cal_events:
             tmp = []
-    for e in cal_events:
-    try:
-        tmp.append(str(e.get('event','')))
-    except:
-           pass
-         titles = " ".join(tmp).upper()
+            for e in cal_events:
+                try:
+                    tmp.append(str(e.get('event','')))
+                except:
+                    pass
+            titles = " ".join(tmp).upper()
         focus = "بدون خبر مهم امروز"
-     if "CPI" in titles or "PCE" in titles:
+        if "CPI" in titles or "PCE" in titles:
             focus = "تورم"
-     elif "NFP" in titles or "EMPLOYMENT" in titles:
+        elif "NFP" in titles or "EMPLOYMENT" in titles:
             focus = "اشتغال"
-     elif "FED" in titles or "FOMC" in titles:
+        elif "FED" in titles or "FOMC" in titles:
             focus = "فدرال رزرو"
-     elif "ECB" in titles:
+        elif "ECB" in titles:
             focus = "بانک مرکزی اروپا"
-     elif "GDP" in titles:
+        elif "GDP" in titles:
             focus = "رشد اقتصادی"
         status = "بازار در انتظار"
-     try:
+        try:
             b = int(bull)
             be = int(bear)
-      if b > be + 15:
+            if b > be + 15:
                 status = "تمایل صعودی به نفع یورو"
-     elif be > b + 15:
+            elif be > b + 15:
                 status = "تمایل نزولی به نفع دلار"
         except:
             pass
