@@ -6,7 +6,7 @@ on:
     - cron: '10 4 * * 1-5'      # 07:40 تهران - خبر صبح
     - cron: '30 12 * * 1-5'     # 16:00 تهران - قبل بازار آمریکا
     - cron: '30 14 * * 1-5'     # 18:00 تهران - جمع‌بندی عصر
-    - cron: '0,30 5-17 * * 1-5' # چک اخبار فوری هر 30 دقیقه
+    - cron: '0,30 5-17 * * 1-5' # چک خبر فوری هر 30 دقیقه
   workflow_dispatch:
     inputs:
       slot:
@@ -21,11 +21,13 @@ on:
           - us_preopen
           - evening
           - manual
+          - watch
 
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 8
+
     steps:
       - uses: actions/checkout@v4
 
@@ -37,19 +39,17 @@ jobs:
       - name: Install deps
         run: |
           pip install -r requirements.txt
-          pip install edge-tts gtts feedparser beautifulsoup4 \
-                      python-dotenv pytz jdatetime lxml groq
 
       - name: Determine slot based on time
         id: slot
         run: |
-          if [ "${{ github.event.inputs.slot }}" != "" ] && \
-             [ "${{ github.event.inputs.slot }}" != "auto" ]; then
+          if [ "${{ github.event.inputs.slot }}" != "" ] && [ "${{ github.event.inputs.slot }}" != "auto" ]; then
             echo "slot=${{ github.event.inputs.slot }}" >> $GITHUB_OUTPUT
           else
             HOUR=$(TZ='Asia/Tehran' date +%H)
             MIN=$(TZ='Asia/Tehran' date +%M)
             TOTAL=$((10#$HOUR * 60 + 10#$MIN))
+
             if [ $TOTAL -ge 450 ] && [ $TOTAL -lt 460 ]; then
               echo "slot=morning" >> $GITHUB_OUTPUT
             elif [ $TOTAL -ge 460 ] && [ $TOTAL -lt 470 ]; then
@@ -62,7 +62,9 @@ jobs:
               echo "slot=watch" >> $GITHUB_OUTPUT
             fi
           fi
-          echo "Selected slot: $(cat $GITHUB_OUTPUT)"
+
+          echo "Selected slot:"
+          cat $GITHUB_OUTPUT
 
       - name: Run EURUSD Bot
         env:
@@ -84,9 +86,8 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          curl -s -X POST \
-            "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \
             -d parse_mode="Markdown" \
             -d text="⚠️ *خطا در ربات EURUSD*%0A%0Aاجرا با خطا مواجه شد.%0Aزمان: $(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M')%0A%0Aلطفاً لاگ گیت‌هاب را بررسی کنید." \
-            || true          python eurusd_telegram.py --slot morning
+            || true
