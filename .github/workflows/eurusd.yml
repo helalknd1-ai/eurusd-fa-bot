@@ -15,6 +15,8 @@ on:
           - evening
           - manual
           - watch
+          - weekly
+          - verify
 
 permissions:
   contents: write
@@ -25,7 +27,7 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -42,16 +44,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Show run info
-        run: |
-          echo "=========================================="
-          echo "🚀 EURUSD Bot Run"
-          echo "=========================================="
-          echo "Slot: ${{ github.event.inputs.slot }}"
-          echo "Time (Tehran): $(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M:%S')"
-          echo "Time (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
-          echo "=========================================="
-
       - name: Run EURUSD Bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -66,24 +58,26 @@ jobs:
         run: |
           python -u eurusd_telegram.py --slot ${{ github.event.inputs.slot }}
 
-      - name: Commit seen events file
+      - name: Commit data files
         if: always()
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          if [ -f seen_events.json ]; then
-            git add seen_events.json
-            
-            if ! git diff --staged --quiet; then
-              git commit -m "🤖 Update seen events [skip ci]"
-              git push
-              echo "✅ seen_events.json updated"
-            else
-              echo "ℹ️ No changes in seen_events.json"
+          FILES_CHANGED=false
+          
+          for file in seen_events.json predictions.json performance.json; do
+            if [ -f "$file" ]; then
+              git add "$file"
+              FILES_CHANGED=true
             fi
-          else
-            echo "ℹ️ seen_events.json not found"
+          done
+          
+          if [ "$FILES_CHANGED" = "true" ]; then
+            if ! git diff --staged --quiet; then
+              git commit -m "🤖 Update bot data [skip ci]"
+              git push
+            fi
           fi
 
       - name: Notify on failure
@@ -92,13 +86,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          SLOT="${{ github.event.inputs.slot }}"
-          TIME=$(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M')
-          
-          MESSAGE="⚠️ *خطا در ربات EURUSD*%0A%0A📌 Slot: \`${SLOT}\`%0A🕒 زمان: ${TIME}%0A%0Aلطفاً لاگ GitHub Actions را بررسی کنید."
-          
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \
-            -d parse_mode="Markdown" \
-            -d text="${MESSAGE}" \
+            -d text="⚠️ خطا در ربات EURUSD - $(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M')" \
             || true
