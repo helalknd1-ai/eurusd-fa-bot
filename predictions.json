@@ -28,5 +28,20 @@
     "result": null,
     "price_change_pips": null,
     "checked_at": null
+  },
+  "20260710_1801_evening": {
+    "timestamp": "2026-07-10T18:01:18.704534+03:30",
+    "date": "2026-07-10",
+    "time": "18:01",
+    "slot": "evening",
+    "direction": "خنثی",
+    "bull_score": 0,
+    "bear_score": 0,
+    "price_at_prediction": 1.143,
+    "has_news": false,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null,
+    "checked_at": null
   }
 }
