@@ -985,11 +985,69 @@ def send_telegram_text(text):
 
     return all_ok
 
+def normalize_voice_text(text):
+    text = str(text or "").strip()
+
+    replacements = {
+        "EUR/USD": "یورو دلار",
+        "EURUSD": "یورو دلار",
+        "EUR": "یورو",
+        "USD": "دلار",
+        "ECB": "بانک مرکزی اروپا",
+        "Fed": "فدرال رزرو",
+        "FOMC": "کمیته بازار آزاد فدرال رزرو",
+        "CPI": "تورم مصرف کننده",
+        "PCE": "تورم پی سی ای",
+        "NFP": "اشتغال آمریکا",
+        "PMI": "شاخص مدیران خرید",
+        "GDP": "رشد اقتصادی",
+        "DXY": "شاخص دلار",
+        "High": "خیلی مهم",
+        "Medium": "متوسط",
+        "actual": "عدد واقعی",
+        "forecast": "پیش بینی",
+        "manual": "اجرای دستی",
+        "watch": "خبر فوری",
+        "news_morning": "خبر صبح",
+        "us_preopen": "قبل از بازار آمریکا",
+    }
+
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    # حذف کاراکترهای بد برای تلفظ
+    text = text.replace("/", " ")
+    text = text.replace("|", " . ")
+    text = text.replace("-", " ")
+    text = text.replace("_", " ")
+    text = text.replace("•", "")
+    text = text.replace("📌", "")
+    text = text.replace("📅", "")
+    text = text.replace("📰", "")
+    text = text.replace("⚖️", "")
+    text = text.replace("🤖", "")
+    text = text.replace("🔔", "")
+    text = text.replace("🌅", "")
+    text = text.replace("☕", "")
+    text = text.replace("🌆", "")
+    text = text.replace("🌙", "")
+    text = text.replace("🟢", "")
+    text = text.replace("🟡", "")
+    text = text.replace("🔴", "")
+
+    # یکدست‌سازی حروف
+    text = text.replace("ي", "ی").replace("ك", "ک")
+
+    # حذف فاصله‌های اضافی
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text
 
 def send_telegram_voice(text_fa):
     if not SEND_VOICE:
         return False
 
+    text_fa = normalize_voice_text(text_fa)
     audio_path = None
 
     try:
