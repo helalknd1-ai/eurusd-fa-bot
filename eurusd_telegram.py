@@ -853,11 +853,12 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل �
     msg = "\n".join(msg_parts)
 
     voice_parts = [
-        f"تحلیل فاندامنتال یورو دلار، {date_short}، {slot_label}.",
-        f"جهت فعلی بازار {direction} است.",
-        "نکته اصلی، واکنش دلار و خبرهای مهم اقتصادی است.",
-        "با مدیریت ریسک معامله کنید."
-    ]
+    f"تحلیل فاندامنتال یورو دلار، {date_short}.",
+    f"جهت فعلی بازار {direction} است.",
+    f"تمایل بازار: {bias}.",
+    "امروز توجه بازار روی خبرهای اقتصادی و واکنش دلار است.",
+    "با مدیریت ریسک معامله کنید."
+]
     voice_text = "\n".join(voice_parts)
 
     return msg, voice_text
@@ -1051,36 +1052,27 @@ def send_telegram_voice(text_fa):
     audio_path = None
 
     try:
-        try:
-            import edge_tts
-            import asyncio
-            import tempfile
+        import edge_tts
+        import asyncio
+        import tempfile
 
-            voice = os.getenv("VOICE_NAME", VOICE_NAME)
+        voice = os.getenv("VOICE_NAME", "fa-IR-DilaraNeural")
+        rate = os.getenv("VOICE_RATE", "-12%")
+        pitch = os.getenv("VOICE_PITCH", "+0Hz")
 
-            async def _synth():
-                communicate = edge_tts.Communicate(
-                    text_fa,
-                    voice,
-                    rate=VOICE_RATE,
-                    pitch=VOICE_PITCH,
-                )
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tf:
-                    out_path = tf.name
-                await communicate.save(out_path)
-                return out_path
+        async def _synth():
+            communicate = edge_tts.Communicate(
+                text_fa,
+                voice,
+                rate=rate,
+                pitch=pitch,
+            )
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tf:
+                out_path = tf.name
+            await communicate.save(out_path)
+            return out_path
 
-            audio_path = asyncio.run(_synth())
-
-        except Exception as e_edge:
-            print("edge-tts failed, fallback gTTS:", e_edge)
-            from gtts import gTTS
-            import tempfile
-
-            tts = gTTS(text=text_fa, lang="fa", slow=False)
-            fd, audio_path = tempfile.mkstemp(suffix=".mp3")
-            os.close(fd)
-            tts.save(audio_path)
+        audio_path = asyncio.run(_synth())
 
         if TELEGRAM_TOKEN.startswith("PUT_"):
             print(f"[VOICE DRY RUN] saved {audio_path}")
@@ -1093,9 +1085,9 @@ def send_telegram_voice(text_fa):
                 url,
                 data={
                     "chat_id": CHAT_ID,
-                    "title": "EUR/USD FA – Persian",
+                    "title": "تحلیل فاندامنتال یورو دلار",
                     "performer": "EURUSDFaBot",
-                    "caption": "تحلیل صوتی – بدون قیمت",
+                    "caption": "تحلیل صوتی فارسی",
                 },
                 files={"audio": f},
                 timeout=30,
@@ -1114,7 +1106,6 @@ def send_telegram_voice(text_fa):
                 os.unlink(audio_path)
         except Exception:
             pass
-
 
 # ---------- RUN ----------
 def run_once(slot="manual"):
