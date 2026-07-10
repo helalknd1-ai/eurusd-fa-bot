@@ -1,21 +1,14 @@
 name: EURUSD FA Persian – Telegram
 
 on:
-  schedule:
-    - cron: '0 4 * * 1-5'       # 07:30 تهران - تحلیل صبح
-    - cron: '10 4 * * 1-5'      # 07:40 تهران - خبر صبح
-    - cron: '30 12 * * 1-5'     # 16:00 تهران - قبل بازار آمریکا
-    - cron: '30 14 * * 1-5'     # 18:00 تهران - جمع‌بندی عصر
-    - cron: '0,30 5-17 * * 1-5' # چک خبر فوری هر 30 دقیقه
   workflow_dispatch:
     inputs:
       slot:
         description: 'انتخاب زمان اجرا'
         required: false
-        default: 'auto'
+        default: 'watch'
         type: choice
         options:
-          - auto
           - morning
           - news_morning
           - us_preopen
@@ -23,48 +16,41 @@ on:
           - manual
           - watch
 
+permissions:
+  contents: write
+
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Determine slot based on time
-        id: slot
+      - name: Show run info
         run: |
-          if [ "${{ github.event.inputs.slot }}" != "" ] && [ "${{ github.event.inputs.slot }}" != "auto" ]; then
-            echo "slot=${{ github.event.inputs.slot }}" >> $GITHUB_OUTPUT
-          else
-            HOUR=$(TZ='Asia/Tehran' date +%H)
-            MIN=$(TZ='Asia/Tehran' date +%M)
-            TOTAL=$((10#$HOUR * 60 + 10#$MIN))
-
-            if [ $TOTAL -ge 450 ] && [ $TOTAL -lt 460 ]; then
-              echo "slot=morning" >> $GITHUB_OUTPUT
-            elif [ $TOTAL -ge 460 ] && [ $TOTAL -lt 470 ]; then
-              echo "slot=news_morning" >> $GITHUB_OUTPUT
-            elif [ $TOTAL -ge 960 ] && [ $TOTAL -lt 970 ]; then
-              echo "slot=us_preopen" >> $GITHUB_OUTPUT
-            elif [ $TOTAL -ge 1080 ] && [ $TOTAL -lt 1090 ]; then
-              echo "slot=evening" >> $GITHUB_OUTPUT
-            else
-              echo "slot=watch" >> $GITHUB_OUTPUT
-            fi
-          fi
-
-          echo "Selected slot:"
-          cat $GITHUB_OUTPUT
+          echo "=========================================="
+          echo "🚀 EURUSD Bot Run"
+          echo "=========================================="
+          echo "Slot: ${{ github.event.inputs.slot }}"
+          echo "Time (Tehran): $(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M:%S')"
+          echo "Time (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
+          echo "=========================================="
 
       - name: Run EURUSD Bot
         env:
@@ -73,12 +59,32 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SEND_VOICE: "true"
           VOICE_NAME: "fa-IR-DilaraNeural"
-          VOICE_RATE: "-8%"
+          VOICE_RATE: "-12%"
           VOICE_PITCH: "+0Hz"
           NEWS_IMPACT: "High,Medium"
           TZ: "Asia/Tehran"
         run: |
-          python -u eurusd_telegram.py --slot ${{ steps.slot.outputs.slot }}
+          python -u eurusd_telegram.py --slot ${{ github.event.inputs.slot }}
+
+      - name: Commit seen events file
+        if: always()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          if [ -f seen_events.json ]; then
+            git add seen_events.json
+            
+            if ! git diff --staged --quiet; then
+              git commit -m "🤖 Update seen events [skip ci]"
+              git push
+              echo "✅ seen_events.json updated"
+            else
+              echo "ℹ️ No changes in seen_events.json"
+            fi
+          else
+            echo "ℹ️ seen_events.json not found"
+          fi
 
       - name: Notify on failure
         if: failure()
@@ -86,8 +92,13 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          SLOT="${{ github.event.inputs.slot }}"
+          TIME=$(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M')
+          
+          MESSAGE="⚠️ *خطا در ربات EURUSD*%0A%0A📌 Slot: \`${SLOT}\`%0A🕒 زمان: ${TIME}%0A%0Aلطفاً لاگ GitHub Actions را بررسی کنید."
+          
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \
             -d parse_mode="Markdown" \
-            -d text="⚠️ *خطا در ربات EURUSD*%0A%0Aاجرا با خطا مواجه شد.%0Aزمان: $(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M')%0A%0Aلطفاً لاگ گیت‌هاب را بررسی کنید." \
+            -d text="${MESSAGE}" \
             || true
