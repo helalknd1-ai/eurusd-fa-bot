@@ -197,6 +197,71 @@ def save_seen_events(seen):
 
 
 # ---------- LEARNING FROM MISTAKES ----------
+def get_eurusd_atr(period=14):
+    """
+    محاسبه ATR (Average True Range) برای EUR/USD
+    برای 14 روز گذشته
+    نتیجه به pip برمی‌گرداند
+    """
+    try:
+        # داده 30 روز گذشته
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/EURUSD=X"
+        params = {
+            "range": "1mo",
+            "interval": "1d",
+        }
+        r = requests.get(url, params=params, headers=HEADERS, timeout=10)
+        
+        if r.status_code != 200:
+            return None
+        
+        data = r.json()
+        result = data.get("chart", {}).get("result", [])
+        if not result:
+            return None
+        
+        quotes = result[0].get("indicators", {}).get("quote", [{}])[0]
+        highs = quotes.get("high", [])
+        lows = quotes.get("low", [])
+        closes = quotes.get("close", [])
+        
+        if len(highs) < period + 1:
+            return None
+        
+        # فیلتر None
+        valid_data = [(h, l, c) for h, l, c in zip(highs, lows, closes) 
+                       if h is not None and l is not None and c is not None]
+        
+        if len(valid_data) < period + 1:
+            return None
+        
+        # محاسبه True Range برای هر روز
+        true_ranges = []
+        for i in range(1, len(valid_data)):
+            high, low, close = valid_data[i]
+            prev_close = valid_data[i-1][2]
+            
+            tr = max(
+                high - low,
+                abs(high - prev_close),
+                abs(low - prev_close)
+            )
+            true_ranges.append(tr)
+        
+        # میانگین ATR روزهای اخیر
+        recent_trs = true_ranges[-period:]
+        atr = sum(recent_trs) / len(recent_trs)
+        
+        # تبدیل به pip
+        atr_pips = round(atr * 10000, 1)
+        
+        print(f"ATR ({period} days): {atr_pips} pips")
+        return atr_pips
+    
+    except Exception as ex:
+        print(f"get_eurusd_atr error: {ex}")
+        return None
+        
 def get_eurusd_price():
     """گرفتن قیمت فعلی EUR/USD از Yahoo Finance"""
     try:
@@ -289,8 +354,21 @@ def verify_predictions():
             change_pips = round((current_price - old_price) * 10000, 1)
             direction = pred.get("direction", "خنثی")
             
-            # آیا درست بود؟
-            THRESHOLD = 15  # 15 pips
+                        # محاسبه آستانه بر اساس ATR
+            # آستانه = 25% از ATR روزانه (نسبت متناسب با ساعت‌های گذشته)
+            atr = get_eurusd_atr(14)
+            
+            if atr:
+                # آستانه پویا: 25% ATR برای هر 4 ساعت
+                hours_factor = min(hours_passed / 24, 1.0)
+                THRESHOLD = round(atr * 0.25 * hours_factor, 1)
+                # حداقل 15 و حداکثر 100 pip
+                THRESHOLD = max(15, min(THRESHOLD, 100))
+                print(f"Dynamic threshold: {THRESHOLD} pips (ATR: {atr})")
+            else:
+                # اگر ATR در دسترس نبود، عدد پیش‌فرض
+                THRESHOLD = 30
+                print(f"Using default threshold: {THRESHOLD} pips")
             
             if abs(change_pips) < THRESHOLD:
                 result = "neutral"
@@ -302,6 +380,10 @@ def verify_predictions():
                 result = "correct"
             else:
                 result = "wrong"
+            
+            # ذخیره آستانه استفاده‌شده
+            pred["threshold_used"] = THRESHOLD
+            pred["atr_at_check"] = atr
             
             pred["verified"] = True
             pred["result"] = result
