@@ -1085,7 +1085,8 @@ def check_breaking_headlines():
                 for e in d.entries[:5]:
                     title = clean_html_text(getattr(e, "title", ""))
                     if not is_relevant_news(title): continue
-                    uid = f"headline_{hash(title.lower())}"
+                                        import hashlib
+                    uid = f"headline_{hashlib.md5(title.lower().encode()).hexdigest()}"
                     if uid in seen: continue
                     seen[uid] = {
                         "date": today, "title": title,
