@@ -9,10 +9,13 @@
     "bear_score": 0,
     "price_at_prediction": 1.1434,
     "has_news": false,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null,
-    "checked_at": null
+    "verified": true,
+    "result": "wrong",
+    "price_change_pips": -47.0,
+    "checked_at": "2026-07-13T23:19:24.721418+03:30",
+    "threshold_used": 25,
+    "atr_at_check": 61.3,
+    "price_at_check": 1.1387
   },
   "20260710_1611_manual": {
     "timestamp": "2026-07-10T16:11:24.605851+03:30",
@@ -24,10 +27,13 @@
     "bear_score": 0,
     "price_at_prediction": 1.1432,
     "has_news": false,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null,
-    "checked_at": null
+    "verified": true,
+    "result": "wrong",
+    "price_change_pips": -45.0,
+    "checked_at": "2026-07-13T23:19:24.721418+03:30",
+    "threshold_used": 25,
+    "atr_at_check": 61.3,
+    "price_at_check": 1.1387
   },
   "20260710_1801_evening": {
     "timestamp": "2026-07-10T18:01:18.704534+03:30",
@@ -39,10 +45,13 @@
     "bear_score": 0,
     "price_at_prediction": 1.143,
     "has_news": false,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null,
-    "checked_at": null
+    "verified": true,
+    "result": "wrong",
+    "price_change_pips": -43.0,
+    "checked_at": "2026-07-13T23:19:24.721418+03:30",
+    "threshold_used": 25,
+    "atr_at_check": 61.3,
+    "price_at_check": 1.1387
   },
   "20260713_0731_morning": {
     "timestamp": "2026-07-13T07:31:23.142154+03:30",
@@ -143,6 +152,21 @@
     "bull_score": 5,
     "bear_score": 10,
     "price_at_prediction": 1.1391,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null,
+    "checked_at": null
+  },
+  "20260713_2319_manual": {
+    "timestamp": "2026-07-13T23:19:30.153042+03:30",
+    "date": "2026-07-13",
+    "time": "23:19",
+    "slot": "manual",
+    "direction": "نزولی",
+    "bull_score": 0,
+    "bear_score": 10,
+    "price_at_prediction": 1.1387,
     "has_news": true,
     "verified": false,
     "result": null,
