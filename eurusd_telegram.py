@@ -320,17 +320,19 @@ def verify_predictions():
             change_pips = round((current_price - old_price) * 10000, 1)
             direction = pred.get("direction", "خنثی")
 
-            # آستانه پویا بر اساس ATR
+                        # آستانه پویا بر اساس ATR (اصلاح‌شده)
             atr = get_eurusd_atr(14)
             if atr:
-                hours_factor = min(hours_passed / 24, 1.0)
-                THRESHOLD = round(atr * 0.25 * hours_factor, 1)
-                THRESHOLD = max(15, min(THRESHOLD, 100))
+                # حداقل ۳۰٪ ATR → حرکت واقعی، نه نوسان طبیعی
+                # هرچه زمان بیشتری بگذرد، حرکت قابل قبول‌تر
+                base = atr * 0.30
+                time_factor = 0.5 + 0.5 * min(hours_passed / 12, 1.0)
+                THRESHOLD = round(base * time_factor, 1)
+                THRESHOLD = max(20, min(THRESHOLD, 100))
                 print(f"Dynamic threshold: {THRESHOLD} pips (ATR: {atr})")
             else:
                 THRESHOLD = 30
                 print(f"Default threshold: {THRESHOLD} pips")
-
             if abs(change_pips) < THRESHOLD:
                 result = "neutral"
             elif direction == "صعودی" and change_pips > 0:
@@ -1100,7 +1102,74 @@ def check_breaking_headlines():
 
 
 # ---------- SCORING ----------
-def score_sentiment(text):
+
+def score_sentiment_ai(news_text):
+    """
+    تحلیل احساسات واقعی با Groq — جایگزین کلمات کلیدی.
+    مزایا: context را می‌فهمد، «not dovish» را اشتباه نمی‌گیرد.
+    اگر Groq در دسترس نباشد، fallback به کلمات کلیدی برمی‌گردد.
+    """
+    # اگر Groq نیست → fallback به روش قدیمی
+    if not HAS_GROQ:
+        return score_sentiment_keywords(news_text)
+
+    try:
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "تو تحلیل‌گر احساسات بازار EUR/USD هستی. "
+                        "اخبار را می‌خوانی و فقط یک JSON برمی‌گردانی.\n\n"
+                        "قوانین:\n"
+                        "- 'not dovish' یا 'hawkish' یا 'rate hike' = نزول یورو = bear\n"
+                        "- 'dovish' یا 'rate cut' یا 'weak dollar' = صعود یورو = bull\n"
+                        "- 'unlikely' یا 'not' قبل از کلمه، معنی را برعکس کن\n"
+                        "- خبر خنثی یا نامرتبط = 0/0\n"
+                        "- bull و bear بین 0 تا 15\n\n"
+                        "خروجی دقیقاً این فرمت:\n"
+                        '{"bull": عدد, "bear": عدد, "reason": "یک جمله کوتاه"}'
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"این اخبار را تحلیل کن:\n{news_text[:3000]}",
+                },
+            ],
+            temperature=0.2,
+            max_tokens=200,
+        )
+
+        raw = response.choices[0].message.content.strip()
+
+        # پیدا کردن JSON در متن (حتی اگر اضافه داشت)
+        import json as _json
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start != -1 and end > start:
+            data = _json.loads(raw[start:end])
+            bull = int(data.get("bull", 0))
+            bear = int(data.get("bear", 0))
+            reason = data.get("reason", "")
+
+            # محدود کردن مقادیر
+            bull = max(0, min(15, bull))
+            bear = max(0, min(15, bear))
+
+            print(f"[AI Sentiment] bull={bull} bear={bear} | {reason}")
+            return bull, bear
+
+    except Exception as ex:
+        print("AI sentiment error:", ex)
+
+    # اگر اینجا رسید = خطا داد → fallback
+    print("[AI Sentiment] Fallback to keywords")
+    return score_sentiment_keywords(news_text)
+
+
+def score_sentiment_keywords(text):
+    """روش قدیمی کلمات کلیدی — فقط به‌عنوان fallback نگه داشته شد."""
     lines = [x.strip().lower() for x in str(text or "").splitlines()
              if x.strip() and not x.strip().startswith("===")]
     bull = 0
