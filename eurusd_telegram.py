@@ -326,7 +326,9 @@ def verify_predictions():
         try:
             pred_time = datetime.fromisoformat(pred["timestamp"])
             hours_passed = (now_teh - pred_time).total_seconds() / 3600
-            if hours_passed < 4 or hours_passed > 24:
+            # ✅ اصلاح ۵: فقط بعد از ۲۴ ساعت بررسی شود (نه ۴ ساعت)
+            # دلیل: تحلیل فاندامنتال زمان می‌برد تا اثر کند
+            if hours_passed < 24:
                 continue
             old_price = pred.get("price_at_prediction", 0)
             if not old_price:
@@ -334,12 +336,10 @@ def verify_predictions():
             change_pips = round((current_price - old_price) * 10000, 1)
             direction = pred.get("direction", "خنثی")
 
-            # ✅ اصلاح ۲: آستانه جدید — حداقل ۳۰٪ ATR (نه ۱۵ پیپ)
+            # ✅ اصلاح ۲: آستانه جدید — ۳۵٪ ATR (برای بررسی ۲۴ ساعته)
             if atr:
-                base = atr * 0.30
-                time_factor = 0.5 + 0.5 * min(hours_passed / 12, 1.0)
-                THRESHOLD = round(base * time_factor, 1)
-                THRESHOLD = max(20, min(THRESHOLD, 100))
+                THRESHOLD = round(atr * 0.35, 1)
+                THRESHOLD = max(25, min(THRESHOLD, 100))
                 print(f"Dynamic threshold: {THRESHOLD} pips (ATR: {atr})")
             else:
                 THRESHOLD = 30
@@ -1246,6 +1246,121 @@ def build_currency_strength(bull, bear, calendar_events=None, breaking_news=None
     ])
 
 
+# ==================================================================
+# ✅ قابلیت جدید: سیگنال صبحگاهی به‌عنوان اندیکاتور تأیید معامله
+# ==================================================================
+
+def build_morning_trade_signal(direction, bull, bear, performance, calendar_events=None):
+    """
+    سیگنال صبحگاهی به‌عنوان اندیکاتور تأیید.
+    فقط وقتی دقت ربات کافی باشد، سیگنال قابل اتکا می‌دهد.
+    مثل یک چراغ راهنمایی برای معامله.
+    """
+
+    total = performance.get("total", 0) if performance else 0
+    accuracy = performance.get("accuracy", 0) if performance else 0
+    bear_acc = performance.get("bearish_accuracy", 0) if performance else 0
+    bull_acc = performance.get("bullish_accuracy", 0) if performance else 0
+
+    # --- مرحله ۱: بررسی دقت ربات ---
+    if total < 10:
+        trust_level = "🟡 مرحله یادگیری"
+        trust_detail = f"هنوز فقط {total} پیش‌بینی تأییدشده داریم. حداقل ۱۰ لازم است."
+        tradeable = False
+    elif accuracy < 50:
+        trust_level = "🔴 دقت پایین"
+        trust_detail = f"دقت {accuracy}% است. به حرف ربات اعتماد نکن."
+        tradeable = False
+    elif accuracy < 55:
+        trust_level = "🟡 احتیاط"
+        trust_detail = f"دقت {accuracy}% است. فقط به‌عنوان مرجع نگاه کن."
+        tradeable = False
+    else:
+        trust_level = f"🟢 قابل اتکا ({accuracy}%)"
+        trust_detail = f"دقت {accuracy}% از {total} پیش‌بینی."
+        tradeable = True
+
+    # --- مرحله ۲: قدرت سیگنال ---
+    diff = abs(bull - bear)
+    if direction in ("صعودی", "نزولی") and diff >= 5:
+        strength = "قوی" if tradeable else "—"
+    elif diff >= 3:
+        strength = "متوسط"
+    else:
+        strength = "ضعیف"
+
+    # --- مرحله ۳: تعیین رنگ نهایی چراغ ---
+    if not tradeable:
+        final_light = "🔴" if accuracy < 50 else "🟡"
+        action = "⏳ صبر کن — ربات هنوز یاد می‌گیرد"
+    elif direction == "خنثی" or strength == "ضعیف":
+        final_light = "🟡"
+        action = "⏳ سیگنال ضعیف است — منتظر داده بهتر"
+    else:
+        final_light = "🟢"
+        action = "✅ تأیید خرید در اصلاح" if direction == "صعودی" else "✅ تأیید فروش در رشد"
+
+    # --- مرحله ۴: دقت جهت‌دار ---
+    dir_accuracy = ""
+    if direction == "صعودی" and bull_acc > 0:
+        dir_accuracy = f"(دقت ربات در سیگنال‌های صعودی: {bull_acc}%)"
+    elif direction == "نزولی" and bear_acc > 0:
+        dir_accuracy = f"(دقت ربات در سیگنال‌های نزولی: {bear_acc}%)"
+
+    # --- مرحله ۵: راهنمای استفاده ---
+    if final_light == "🟢":
+        if direction == "صعودی":
+            advice = (
+                "💡 نحوه استفاده:\n"
+                "• تحلیل شما هم صعودی؟ → با اطمینان بیشتر وارد شو\n"
+                "• تحلیل شما نزولی؟ → وارد نشو (سیگنال‌ها متناقض)\n"
+                "• تحقیق نکرده‌ای؟ → فقط این جهت را دنبال نکن"
+            )
+        else:
+            advice = (
+                "💡 نحوه استفاده:\n"
+                "• تحلیل شما هم نزولی؟ → با اطمینان بیشتر وارد شو\n"
+                "• تحلیل شما صعودی؟ → وارد نشو (سیگنال‌ها متناقض)\n"
+                "• تحقیق نکرده‌ای؟ → فقط این جهت را دنبال نکن"
+            )
+    elif final_light == "🟡":
+        advice = (
+            "💡 نحوه استفاده:\n"
+            "• سیگنال کافی نیست → به تحلیل خودت تکیه کن\n"
+            "• این فقط یک مرجع است، نه تأیید قطعی"
+        )
+    else:
+        advice = (
+            "💡 نحوه استفاده:\n"
+            "• دقت ربات پایین است → فعلاً نادیده بگیر\n"
+            "• فقط به تحلیل شخصی خودت اعتماد کن"
+        )
+
+    # --- ساخت پیام ---
+    lines = [
+        f"{final_light} سیگنال صبحگاهی EUR/USD",
+        "━━━━━━━━━━━━━━",
+        f"📐 جهت ربات: {direction}",
+        f"💪 قدرت سیگنال: {strength}",
+        f"📊 امتیاز: صعودی {bull} / نزولی {bear}",
+        "",
+        f"🎯 اعتماد به ربات: {trust_level}",
+        f"   {trust_detail}",
+    ]
+    if dir_accuracy:
+        lines.append(f"   {dir_accuracy}")
+    lines.extend([
+        "",
+        "━━━━━━━━━━━━━━",
+        f"📌 اقدام: {action}",
+        "",
+        advice,
+        "",
+        "⚠️ این یک اندیکاتور تأیید است، نه جایگزین تحلیل شخصی.",
+    ])
+    return "\n".join(lines)
+
+
 def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل",
                 breaking_news=None, indicators=None, correlations=None, cot=None,
                 volatility_alert=None, performance=None):
@@ -1575,6 +1690,15 @@ def run_once(slot="manual"):
         text_msg = "\n".join([text_msg, "", "🤖 تحلیل AI:", ai_analysis])
 
     send_telegram_text(text_msg)
+
+    # ✅ قابلیت جدید: سیگنال صبحگاهی فقط در slot صبحگاهی
+    if slot == "morning":
+        try:
+            signal_msg = build_morning_trade_signal(direction, bull, bear, performance, cal)
+            send_telegram_text(signal_msg)
+        except Exception as ex:
+            print("Morning signal error:", ex)
+
     has_news = bool(cal)
     save_prediction(direction, bull, bear, slot, has_news=has_news)
 
