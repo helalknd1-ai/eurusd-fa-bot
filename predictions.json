@@ -112,5 +112,20 @@
     "result": null,
     "price_change_pips": null,
     "checked_at": null
+  },
+  "20260713_1802_evening": {
+    "timestamp": "2026-07-13T18:02:10.157429+03:30",
+    "date": "2026-07-13",
+    "time": "18:02",
+    "slot": "evening",
+    "direction": "نزولی",
+    "bull_score": 1,
+    "bear_score": 9,
+    "price_at_prediction": 1.1412,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null,
+    "checked_at": null
   }
 }
