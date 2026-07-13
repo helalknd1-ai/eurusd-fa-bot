@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 EUR/USD Fundamental Brief – Persian – Telegram
-نسخه نهایی: با یادگیری از خطاها + همه قابلیت‌ها
+نسخه نهایی: با یادگیری از خطاها + ATR + همه قابلیت‌ها
 """
 
 import os
@@ -87,12 +87,16 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9,fa;q=0.8",
 }
 
+# کلمات کلیدی گسترش‌یافته
 BULLISH = [
     "dovish fed", "fed cut", "fed pause", "soft us cpi",
     "cooling inflation", "weak nfp", "weak payrolls",
     "higher jobless claims", "lower treasury yields",
     "ecb hawkish", "eurozone inflation beats",
-    "dollar weak", "dxy down",
+    "dollar weak", "dxy down", "dollar retreats",
+    "oil falls", "yields drop", "risk on",
+    "fed pivots", "rate cut expected",
+    "euro rises", "euro gains", "eur strength",
 ]
 
 BEARISH = [
@@ -100,6 +104,12 @@ BEARISH = [
     "strong payrolls", "lower jobless claims",
     "higher treasury yields", "ecb dovish",
     "eurozone inflation misses", "dollar strong", "dxy up",
+    "oil prices", "oil jumps", "oil rises",
+    "middle east", "iran strikes", "geopolitical tension",
+    "yields rise", "yields highest", "rate hikes",
+    "inflation risk", "hawkish expected",
+    "euro falls", "euro weakens", "eur weakness",
+    "risk off", "safe haven",
 ]
 
 
@@ -151,6 +161,7 @@ def normalize_voice_text(text):
         "CPI": "تورم مصرف کننده", "PCE": "تورم پی سی ای",
         "NFP": "اشتغال آمریکا", "PMI": "شاخص مدیران خرید",
         "GDP": "رشد اقتصادی", "DXY": "شاخص دلار",
+        "ATR": "میانگین نوسان",
         "COT": "گزارش کات", "High": "خیلی مهم",
         "Medium": "متوسط", "actual": "عدد واقعی",
         "forecast": "پیش بینی", "manual": "اجرای دستی",
@@ -160,7 +171,8 @@ def normalize_voice_text(text):
         text = text.replace(old, new)
     for ch in ["/", "|", "-", "_", "•", "📌", "📅", "📰", "⚖️",
                "🤖", "🔔", "🌅", "☕", "🌆", "🌙", "🟢", "🟡", "🔴",
-               "🚨", "📊", "⏰", "💹", "🌍", "🕒", "🎯", "✅", "❌", "⚪"]:
+               "🚨", "📊", "⏰", "💹", "🌍", "🕒", "🎯", "✅", "❌", "⚪",
+               "📏", "🛢️", "🥇"]:
         text = text.replace(ch, " ")
     text = text.replace("ي", "ی").replace("ك", "ک")
     text = re.sub(r"\s+", " ", text).strip()
@@ -198,72 +210,44 @@ def save_seen_events(seen):
 
 # ---------- LEARNING FROM MISTAKES ----------
 def get_eurusd_atr(period=14):
-    """
-    محاسبه ATR (Average True Range) برای EUR/USD
-    برای 14 روز گذشته
-    نتیجه به pip برمی‌گرداند
-    """
+    """محاسبه ATR بر حسب pip"""
     try:
-        # داده 30 روز گذشته
         url = "https://query1.finance.yahoo.com/v8/finance/chart/EURUSD=X"
-        params = {
-            "range": "1mo",
-            "interval": "1d",
-        }
+        params = {"range": "1mo", "interval": "1d"}
         r = requests.get(url, params=params, headers=HEADERS, timeout=10)
-        
         if r.status_code != 200:
             return None
-        
         data = r.json()
         result = data.get("chart", {}).get("result", [])
         if not result:
             return None
-        
         quotes = result[0].get("indicators", {}).get("quote", [{}])[0]
         highs = quotes.get("high", [])
         lows = quotes.get("low", [])
         closes = quotes.get("close", [])
-        
         if len(highs) < period + 1:
             return None
-        
-        # فیلتر None
-        valid_data = [(h, l, c) for h, l, c in zip(highs, lows, closes) 
-                       if h is not None and l is not None and c is not None]
-        
+        valid_data = [(h, l, c) for h, l, c in zip(highs, lows, closes)
+                      if h is not None and l is not None and c is not None]
         if len(valid_data) < period + 1:
             return None
-        
-        # محاسبه True Range برای هر روز
         true_ranges = []
         for i in range(1, len(valid_data)):
             high, low, close = valid_data[i]
             prev_close = valid_data[i-1][2]
-            
-            tr = max(
-                high - low,
-                abs(high - prev_close),
-                abs(low - prev_close)
-            )
+            tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
             true_ranges.append(tr)
-        
-        # میانگین ATR روزهای اخیر
         recent_trs = true_ranges[-period:]
         atr = sum(recent_trs) / len(recent_trs)
-        
-        # تبدیل به pip
         atr_pips = round(atr * 10000, 1)
-        
         print(f"ATR ({period} days): {atr_pips} pips")
         return atr_pips
-    
     except Exception as ex:
         print(f"get_eurusd_atr error: {ex}")
         return None
-        
+
+
 def get_eurusd_price():
-    """گرفتن قیمت فعلی EUR/USD از Yahoo Finance"""
     try:
         url = "https://query1.finance.yahoo.com/v8/finance/chart/EURUSD=X"
         r = requests.get(url, headers=HEADERS, timeout=8)
@@ -281,18 +265,13 @@ def get_eurusd_price():
 
 
 def save_prediction(direction, bull, bear, slot, has_news=False):
-    """ذخیره پیش‌بینی برای بررسی بعدی"""
     now_teh = datetime.now(TEHRAN_TZ)
     price = get_eurusd_price()
-    
     if not price:
-        print("Cannot save prediction: no price available")
+        print("Cannot save prediction: no price")
         return
-    
     predictions = load_json_file(PREDICTIONS_FILE, {})
-    
     pred_id = f"{now_teh.strftime('%Y%m%d_%H%M')}_{slot}"
-    
     predictions[pred_id] = {
         "timestamp": now_teh.isoformat(),
         "date": now_teh.strftime("%Y-%m-%d"),
@@ -308,68 +287,50 @@ def save_prediction(direction, bull, bear, slot, has_news=False):
         "price_change_pips": None,
         "checked_at": None,
     }
-    
-    # فقط 100 پیش‌بینی آخر را نگه دار
     if len(predictions) > 100:
-        # حذف قدیمی‌ترها
         sorted_keys = sorted(predictions.keys())
         for k in sorted_keys[:len(predictions) - 100]:
             del predictions[k]
-    
     save_json_file(PREDICTIONS_FILE, predictions)
     print(f"Prediction saved: {pred_id} - {direction} @ {price}")
 
 
 def verify_predictions():
-    """بررسی پیش‌بینی‌های قبلی و محاسبه دقت"""
     predictions = load_json_file(PREDICTIONS_FILE, {})
     if not predictions:
         return {"total": 0, "correct": 0, "wrong": 0, "neutral": 0}
-    
     current_price = get_eurusd_price()
     if not current_price:
         print("Cannot verify: no current price")
         return None
-    
     now_teh = datetime.now(TEHRAN_TZ)
     changes_made = False
-    
+
     for pred_id, pred in predictions.items():
         if pred.get("verified"):
             continue
-        
         try:
             pred_time = datetime.fromisoformat(pred["timestamp"])
             hours_passed = (now_teh - pred_time).total_seconds() / 3600
-            
-            # فقط پیش‌بینی‌های 4 تا 8 ساعته را بررسی کن
             if hours_passed < 4 or hours_passed > 24:
                 continue
-            
             old_price = pred.get("price_at_prediction", 0)
             if not old_price:
                 continue
-            
-            # محاسبه تغییر به pip
             change_pips = round((current_price - old_price) * 10000, 1)
             direction = pred.get("direction", "خنثی")
-            
-                        # محاسبه آستانه بر اساس ATR
-            # آستانه = 25% از ATR روزانه (نسبت متناسب با ساعت‌های گذشته)
+
+            # آستانه پویا بر اساس ATR
             atr = get_eurusd_atr(14)
-            
             if atr:
-                # آستانه پویا: 25% ATR برای هر 4 ساعت
                 hours_factor = min(hours_passed / 24, 1.0)
                 THRESHOLD = round(atr * 0.25 * hours_factor, 1)
-                # حداقل 15 و حداکثر 100 pip
                 THRESHOLD = max(15, min(THRESHOLD, 100))
                 print(f"Dynamic threshold: {THRESHOLD} pips (ATR: {atr})")
             else:
-                # اگر ATR در دسترس نبود، عدد پیش‌فرض
                 THRESHOLD = 30
-                print(f"Using default threshold: {THRESHOLD} pips")
-            
+                print(f"Default threshold: {THRESHOLD} pips")
+
             if abs(change_pips) < THRESHOLD:
                 result = "neutral"
             elif direction == "صعودی" and change_pips > 0:
@@ -380,63 +341,46 @@ def verify_predictions():
                 result = "correct"
             else:
                 result = "wrong"
-            
-            # ذخیره آستانه استفاده‌شده
+
             pred["threshold_used"] = THRESHOLD
             pred["atr_at_check"] = atr
-            
             pred["verified"] = True
             pred["result"] = result
             pred["price_change_pips"] = change_pips
             pred["price_at_check"] = current_price
             pred["checked_at"] = now_teh.isoformat()
             changes_made = True
-            
             print(f"Verified {pred_id}: {direction} → {change_pips} pips → {result}")
-        
+
         except Exception as ex:
             print(f"Verify error for {pred_id}:", ex)
-    
+
     if changes_made:
         save_json_file(PREDICTIONS_FILE, predictions)
-    
     return calculate_performance(predictions)
 
 
 def calculate_performance(predictions=None):
-    """محاسبه آمار عملکرد"""
     if predictions is None:
         predictions = load_json_file(PREDICTIONS_FILE, {})
-    
     verified = [p for p in predictions.values() if p.get("verified")]
-    
     if not verified:
         return {"total": 0, "correct": 0, "wrong": 0, "neutral": 0, "accuracy": 0}
-    
     correct = sum(1 for p in verified if p["result"] == "correct")
     wrong = sum(1 for p in verified if p["result"] == "wrong")
     neutral = sum(1 for p in verified if p["result"] == "neutral")
     total = len(verified)
     accuracy = round((correct / total) * 100, 1) if total > 0 else 0
-    
-    # آمار تفکیکی
-    bullish_correct = sum(1 for p in verified 
-                          if p["direction"] == "صعودی" and p["result"] == "correct")
+
+    bullish_correct = sum(1 for p in verified if p["direction"] == "صعودی" and p["result"] == "correct")
     bullish_total = sum(1 for p in verified if p["direction"] == "صعودی")
-    
-    bearish_correct = sum(1 for p in verified 
-                           if p["direction"] == "نزولی" and p["result"] == "correct")
+    bearish_correct = sum(1 for p in verified if p["direction"] == "نزولی" and p["result"] == "correct")
     bearish_total = sum(1 for p in verified if p["direction"] == "نزولی")
-    
-    news_correct = sum(1 for p in verified 
-                        if p.get("has_news") and p["result"] == "correct")
+    news_correct = sum(1 for p in verified if p.get("has_news") and p["result"] == "correct")
     news_total = sum(1 for p in verified if p.get("has_news"))
-    
+
     return {
-        "total": total,
-        "correct": correct,
-        "wrong": wrong,
-        "neutral": neutral,
+        "total": total, "correct": correct, "wrong": wrong, "neutral": neutral,
         "accuracy": accuracy,
         "bullish_accuracy": round((bullish_correct / bullish_total) * 100, 1) if bullish_total > 0 else 0,
         "bullish_total": bullish_total,
@@ -448,12 +392,9 @@ def calculate_performance(predictions=None):
 
 
 def build_performance_view(perf):
-    """ساخت متن عملکرد ربات"""
-    if not perf or perf["total"] < 3:
-        return "🎯 عملکرد ربات:\nهنوز داده کافی برای محاسبه دقت نیست."
-    
+    if not perf or perf["total"] < 1:
+        return "🎯 عملکرد ربات:\nهنوز داده کافی برای دقت نیست."
     accuracy = perf["accuracy"]
-    
     if accuracy >= 70:
         emoji = "🟢"
         rating = "عالی"
@@ -466,32 +407,24 @@ def build_performance_view(perf):
     else:
         emoji = "🔴"
         rating = "نیاز به بهبود"
-    
     lines = [
         f"🎯 عملکرد ربات ({perf['total']} پیش‌بینی):",
         f"{emoji} دقت کلی: {accuracy}% ({rating})",
         f"✅ درست: {perf['correct']} | ❌ اشتباه: {perf['wrong']} | ⚪ خنثی: {perf['neutral']}",
     ]
-    
     if perf["bullish_total"] > 0:
         lines.append(f"🟢 دقت صعودی: {perf['bullish_accuracy']}% ({perf['bullish_total']} پیش‌بینی)")
-    
     if perf["bearish_total"] > 0:
         lines.append(f"🔴 دقت نزولی: {perf['bearish_accuracy']}% ({perf['bearish_total']} پیش‌بینی)")
-    
     if perf["news_total"] > 0:
         lines.append(f"📰 دقت در روزهای خبر: {perf['news_accuracy']}% ({perf['news_total']} پیش‌بینی)")
-    
     return "\n".join(lines)
 
 
 def adjust_confidence_by_performance(base_confidence, perf):
-    """تنظیم اطمینان بر اساس عملکرد گذشته"""
     if not perf or perf["total"] < 10:
         return base_confidence
-    
     accuracy = perf["accuracy"]
-    
     if accuracy >= 70:
         return "بالا"
     elif accuracy >= 55:
@@ -504,10 +437,7 @@ def adjust_confidence_by_performance(base_confidence, perf):
 
 # ---------- MARKET INDICATORS ----------
 def fetch_market_indicators():
-    indicators = {
-        "DXY": None, "US10Y": None, "GOLD": None,
-        "OIL": None, "SP500": None,
-    }
+    indicators = {"DXY": None, "US10Y": None, "GOLD": None, "OIL": None, "SP500": None}
     tickers = {
         "DXY": "DX-Y.NYB", "US10Y": "^TNX",
         "GOLD": "GC=F", "OIL": "CL=F", "SP500": "^GSPC",
@@ -537,7 +467,6 @@ def fetch_market_indicators():
 def build_indicators_view(indicators):
     if not any(indicators.values()):
         return "💹 شاخص‌های بازار: داده در دسترس نیست."
-    
     lines = ["💹 شاخص‌های کلیدی بازار:"]
     names_fa = {
         "DXY": "شاخص دلار (DXY)",
@@ -552,7 +481,16 @@ def build_indicators_view(indicators):
             arrow = "🟢" if data["change_pct"] >= 0 else "🔴"
             sign = "+" if data["change_pct"] >= 0 else ""
             lines.append(f"{arrow} {label}: {data['price']} ({sign}{data['change_pct']}%)")
-    
+
+    # اضافه کردن ATR
+    atr = get_eurusd_atr(14)
+    if atr:
+        lines.append(f"📏 ATR روزانه EUR/USD: {atr} pips")
+        if atr > 80:
+            lines.append("⚠️ نوسان بالا - احتیاط بیشتر")
+        elif atr < 40:
+            lines.append("💤 نوسان کم - بازار آرام")
+
     dxy = indicators.get("DXY")
     yields = indicators.get("US10Y")
     if dxy and yields:
@@ -646,14 +584,29 @@ def check_volatility_alert(indicators, correlations):
     if dxy and abs(dxy["change_pct"]) > 0.5:
         direction = "صعود" if dxy["change_pct"] > 0 else "نزول"
         alerts.append(f"⚠️ نوسان شدید DXY: {direction} {abs(dxy['change_pct'])}%")
+
     yields = indicators.get("US10Y") if indicators else None
     if yields and abs(yields["change_pct"]) > 2:
         direction = "صعود" if yields["change_pct"] > 0 else "نزول"
         alerts.append(f"⚠️ نوسان شدید بازده: {direction} {abs(yields['change_pct'])}%")
+
+    # هشدار نوسان نفت
+    oil = indicators.get("OIL") if indicators else None
+    if oil and abs(oil["change_pct"]) > 3:
+        direction = "صعود" if oil["change_pct"] > 0 else "نزول"
+        alerts.append(f"🛢️ نوسان شدید نفت: {direction} {abs(oil['change_pct'])}%")
+
+    # هشدار نوسان طلا
+    gold = indicators.get("GOLD") if indicators else None
+    if gold and abs(gold["change_pct"]) > 1.5:
+        direction = "صعود" if gold["change_pct"] > 0 else "نزول"
+        alerts.append(f"🥇 نوسان شدید طلا: {direction} {abs(gold['change_pct'])}%")
+
     for pair, change in (correlations or {}).items():
         if abs(change) > 0.7:
             direction = "صعود" if change > 0 else "نزول"
             alerts.append(f"⚠️ نوسان شدید {pair}: {direction} {abs(change)}%")
+
     if alerts:
         return "\n".join(["🚨 هشدار نوسان شدید:"] + alerts)
     return None
@@ -666,7 +619,6 @@ def check_upcoming_events(minutes_ahead=30):
         now_teh = datetime.now(TEHRAN_TZ)
         alerts = []
         seen = load_seen_events()
-        
         for ev in data:
             if ev.get("country") not in ["USD", "EUR", "EMU"]:
                 continue
@@ -687,7 +639,6 @@ def check_upcoming_events(minutes_ahead=30):
                     "sent_at": now_teh.strftime("%Y-%m-%d %H:%M"),
                 }
                 alerts.append(ev)
-        
         if alerts:
             save_seen_events(seen)
         return alerts
@@ -856,17 +807,34 @@ def fetch_calendar_full():
 
 
 def get_today_events():
+    """گرفتن خبرهای امروز و فردا بر اساس تاریخ تهران - اصلاح‌شده"""
     data = fetch_calendar_full()
     now_teh = datetime.now(TEHRAN_TZ)
-    today = now_teh.strftime("%Y-%m-%d")
-    tomorrow = (now_teh + timedelta(days=1)).strftime("%Y-%m-%d")
+    today_teh = now_teh.date()
+    tomorrow_teh = (now_teh + timedelta(days=1)).date()
+
     out = []
     for ev in data:
-        if (ev.get("country") in ["USD", "EUR", "EMU"]
-                and ev.get("impact") in ("High", "Medium")):
-            d = ev.get("date", "")[:10]
-            if d in [today, tomorrow]:
-                out.append(ev)
+        if ev.get("country") not in ["USD", "EUR", "EMU"]:
+            continue
+        if ev.get("impact") not in ("High", "Medium"):
+            continue
+
+        dt = parse_event_datetime(ev)
+        if not dt:
+            continue
+
+        event_date_teh = dt.astimezone(TEHRAN_TZ).date()
+
+        if event_date_teh == today_teh:
+            ev["_is_today"] = True
+            ev["_is_tomorrow"] = False
+            out.append(ev)
+        elif event_date_teh == tomorrow_teh:
+            ev["_is_today"] = False
+            ev["_is_tomorrow"] = True
+            out.append(ev)
+
     return out
 
 
@@ -966,9 +934,10 @@ def build_morning_calendar_alert(calendar_events):
         date_fa = now_teh.strftime("%Y-%m-%d %H:%M تهران")
 
     allowed = {x.strip().lower() for x in NEWS_IMPACT_LEVELS}
+    # فقط خبرهای امروز
     events = [ev for ev in calendar_events
               if (ev.get("impact") or "").strip().lower() in allowed
-              and is_event_today_tehran(ev)]
+              and ev.get("_is_today")]
 
     if not events:
         return "\n".join([
@@ -1011,7 +980,7 @@ def build_weekly_report():
         date_fa = jd.strftime("%A %d %B %Y")
     else:
         date_fa = now_teh.strftime("%Y-%m-%d")
-    
+
     news = fetch_news_all()
     week_events = get_week_events()
     indicators = fetch_market_indicators()
@@ -1019,7 +988,7 @@ def build_weekly_report():
     cot = fetch_cot_data()
     bull, bear = score_sentiment(news)
     performance = verify_predictions()
-    
+
     parts = [
         "📊 گزارش هفتگی EUR/USD",
         date_fa, "",
@@ -1029,36 +998,29 @@ def build_weekly_report():
         f"• امتیاز نزولی: {bear}",
         "",
     ]
-    
+
     if performance and performance.get("total", 0) > 0:
-        parts.extend([
-            "━━━━━━━━━━━━━━",
-            build_performance_view(performance),
-            "",
-        ])
-    
+        parts.extend(["━━━━━━━━━━━━━━", build_performance_view(performance), ""])
+
     if indicators:
         parts.extend(["━━━━━━━━━━━━━━", build_indicators_view(indicators), ""])
     if correlations:
         parts.extend(["━━━━━━━━━━━━━━", build_correlation_view(correlations), ""])
     if cot:
         parts.extend(["━━━━━━━━━━━━━━", build_cot_view(cot), ""])
-    
-    parts.extend([
-        "━━━━━━━━━━━━━━",
-        "📅 خبرهای مهم هفته آینده:",
-    ])
+
+    parts.extend(["━━━━━━━━━━━━━━", "📅 خبرهای مهم هفته آینده:"])
     if week_events:
         for ev in week_events[:10]:
             parts.append(f"• {event_time_tehran(ev)} | {ev.get('country', '')} | {ev.get('title', '')}")
     else:
         parts.append("خبر مهمی ثبت نشده.")
-    
+
     parts.extend(["", "━━━━━━━━━━━━━━", "🤖 تحلیل AI:"])
     ai = ai_analyze(news, week_events, bull, bear, indicators, correlations, cot, performance)
     if ai:
         parts.append(ai)
-    
+
     parts.extend([
         "",
         "💡 توصیه هفتگی:",
@@ -1153,7 +1115,9 @@ def score_sentiment(text):
 def build_timeframe_view(bull, bear, calendar_events=None, breaking_news=None):
     diff = int(bull) - int(bear)
     calendar_events = calendar_events or []
-    high_events = [ev for ev in calendar_events if (ev.get("impact") or "").lower() == "high"]
+    # فقط خبرهای امروز
+    today_events = [ev for ev in calendar_events if ev.get("_is_today")]
+    high_events_today = [ev for ev in today_events if (ev.get("impact") or "").lower() == "high"]
 
     if breaking_news:
         instant = "بازار در حال واکنش به خبر تازه."
@@ -1164,7 +1128,7 @@ def build_timeframe_view(bull, bear, calendar_events=None, breaking_news=None):
     else:
         instant = "خنثی."
 
-    today_view = "خبرهای قرمز داریم." if high_events else "فشار خبری کم."
+    today_view = "خبرهای قرمز داریم." if high_events_today else "فشار خبری کم."
 
     if diff >= 4:
         long_term = "ضعف دلار → حمایت EUR/USD."
@@ -1186,8 +1150,10 @@ def build_currency_strength(bull, bear, calendar_events=None, breaking_news=None
     eur_score = clamp(bull)
     usd_score = clamp(bear)
     calendar_events = calendar_events or []
-    high_count = sum(1 for ev in calendar_events if (ev.get("impact") or "").lower() == "high")
-    medium_count = sum(1 for ev in calendar_events if (ev.get("impact") or "").lower() == "medium")
+    # فقط خبرهای امروز
+    today_events = [ev for ev in calendar_events if ev.get("_is_today")]
+    high_count = sum(1 for ev in today_events if (ev.get("impact") or "").lower() == "high")
+    medium_count = sum(1 for ev in today_events if (ev.get("impact") or "").lower() == "medium")
     risk_level = "بالا" if high_count >= 1 else ("متوسط" if medium_count >= 1 else "پایین")
     if breaking_news:
         bn = breaking_news[0] if isinstance(breaking_news, list) else breaking_news
@@ -1265,12 +1231,34 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل",
         keys = ["خبر مستقیم مهم محدود است."]
     bullets = "\n".join([f"- {k}" for k in keys[:3]])
 
+    # تقویم اقتصادی - جدا کردن امروز و فردا
     calendar_text = "خبر تقویمی مهمی نداریم."
     if calendar_events:
+        today_events = [ev for ev in calendar_events if ev.get("_is_today")]
+        tomorrow_events = [ev for ev in calendar_events if ev.get("_is_tomorrow")]
+
         cal_lines = []
-        for ev in calendar_events[:3]:
-            cal_lines.append(f"- {event_time_tehran(ev)} | {ev.get('country','')} | {ev.get('impact','')} | {ev.get('title','')}")
-        calendar_text = "\n".join(cal_lines)
+
+        if today_events:
+            cal_lines.append("📅 امروز:")
+            for ev in today_events[:3]:
+                cal_lines.append(
+                    f"  • {event_time_tehran(ev)} | {ev.get('country','')} | "
+                    f"{ev.get('impact','')} | {ev.get('title','')}"
+                )
+
+        if tomorrow_events:
+            if today_events:
+                cal_lines.append("")
+            cal_lines.append("📅 فردا:")
+            for ev in tomorrow_events[:3]:
+                cal_lines.append(
+                    f"  • {event_time_tehran(ev)} | {ev.get('country','')} | "
+                    f"{ev.get('impact','')} | {ev.get('title','')}"
+                )
+
+        if cal_lines:
+            calendar_text = "\n".join(cal_lines)
 
     try:
         timeframe_view = build_timeframe_view(bull, bear, calendar_events, breaking_news)
@@ -1305,7 +1293,8 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل",
         msg_parts.extend([build_correlation_view(correlations), ""])
     if cot:
         msg_parts.extend([build_cot_view(cot), ""])
-    if performance and performance.get("total", 0) >= 3:
+    # از 1 پیش‌بینی نمایش دهد
+    if performance and performance.get("total", 0) >= 1:
         msg_parts.extend([build_performance_view(performance), ""])
     msg_parts.extend([
         "📰 نکات کلیدی:", bullets, "",
@@ -1409,16 +1398,14 @@ def send_telegram_voice(text_fa):
 # ---------- RUN ----------
 def run_once(slot="manual"):
     now_teh = datetime.now(TEHRAN_TZ)
-    
-    # فقط بررسی دقت
+
     if slot == "verify":
         print("[verify] Checking predictions...")
         performance = verify_predictions()
         if performance:
             print(f"Performance: {performance}")
         return
-    
-    # گزارش هفتگی جمعه‌ها
+
     if slot == "weekly" or (slot == "evening" and now_teh.weekday() == 4):
         print("[weekly] Building weekly report...")
         try:
@@ -1431,7 +1418,6 @@ def run_once(slot="manual"):
         if slot == "weekly":
             return
 
-    # هشدار قبل از خبر
     if slot == "watch":
         try:
             upcoming = check_upcoming_events(30)
@@ -1447,9 +1433,8 @@ def run_once(slot="manual"):
     if slot == "watch":
         print("[watch] Checking...")
         try:
-            # اول تایید پیش‌بینی‌های قدیمی
             verify_predictions()
-            
+
             hits = check_live_news()
             if not hits:
                 headlines = check_breaking_headlines()
@@ -1474,7 +1459,7 @@ def run_once(slot="manual"):
                 correlations = fetch_correlation_pairs()
                 vol_alert = check_volatility_alert(indicators, correlations)
                 performance = calculate_performance()
-                
+
                 text_msg, voice_text, direction = build_brief(
                     news, bull, bear, cal,
                     slot_label="🔔 خبر فوری",
@@ -1495,10 +1480,9 @@ def run_once(slot="manual"):
         return
 
     print(f"[{slot}] Fetching...")
-    
-    # اول تایید پیش‌بینی‌های قدیمی
+
     verify_predictions()
-    
+
     news = fetch_news_all()
     cal = get_today_events()
     bull, bear = score_sentiment(news)
@@ -1530,11 +1514,9 @@ def run_once(slot="manual"):
         text_msg = "\n".join([text_msg, "", "🤖 تحلیل AI:", ai_analysis])
 
     send_telegram_text(text_msg)
-    
-    # ذخیره پیش‌بینی برای یادگیری
     has_news = bool(cal)
     save_prediction(direction, bull, bear, slot, has_news=has_news)
-    
+
     if SEND_VOICE:
         send_telegram_voice(voice_text)
 
