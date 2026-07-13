@@ -58,5 +58,20 @@
     "result": null,
     "price_change_pips": null,
     "checked_at": null
+  },
+  "20260713_0741_news_morning": {
+    "timestamp": "2026-07-13T07:41:07.172817+03:30",
+    "date": "2026-07-13",
+    "time": "07:41",
+    "slot": "news_morning",
+    "direction": "خنثی",
+    "bull_score": 0,
+    "bear_score": 0,
+    "price_at_prediction": 1.14,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null,
+    "checked_at": null
   }
 }
