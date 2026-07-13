@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 """
 EUR/USD Fundamental Brief – Persian – Telegram
-نسخه نهایی: با یادگیری از خطاها + ATR + همه قابلیت‌ها
+نسخه اصلاح‌شده: sentiment با AI + آستانه ATR درست + باگ hash + ATR خارج حلقه
+
+✅ تغییرات اعمال‌شده:
+   1) score_sentiment_ai با Groq (fallback به کلمات کلیدی)
+   2) آستانه پیش‌بینی: حداقل ۳۰٪ ATR (نه ۱۵ پیپ)
+   3) باگ hash اصلاح شد (hashlib)
+   4) ATR از حلقه بیرون آمد (یک بار محاسبه)
 """
 
 import os
 import re
 import json
 import time
+import hashlib
 import argparse
 import requests
 import feedparser
@@ -87,7 +95,7 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9,fa;q=0.8",
 }
 
-# کلمات کلیدی گسترش‌یافته
+# کلمات کلیدی (فقط به‌عنوان fallback اگر Groq نباشد)
 BULLISH = [
     "dovish fed", "fed cut", "fed pause", "soft us cpi",
     "cooling inflation", "weak nfp", "weak payrolls",
@@ -299,12 +307,18 @@ def verify_predictions():
     predictions = load_json_file(PREDICTIONS_FILE, {})
     if not predictions:
         return {"total": 0, "correct": 0, "wrong": 0, "neutral": 0}
+
     current_price = get_eurusd_price()
     if not current_price:
         print("Cannot verify: no current price")
         return None
     now_teh = datetime.now(TEHRAN_TZ)
     changes_made = False
+
+    # ✅ اصلاح ۴: ATR یک بار خارج حلقه محاسبه می‌شود (نه برای هر پیش‌بینی)
+    atr = get_eurusd_atr(14)
+    if atr:
+        print(f"Using ATR for all verifications: {atr} pips")
 
     for pred_id, pred in predictions.items():
         if pred.get("verified"):
@@ -320,11 +334,8 @@ def verify_predictions():
             change_pips = round((current_price - old_price) * 10000, 1)
             direction = pred.get("direction", "خنثی")
 
-                        # آستانه پویا بر اساس ATR (اصلاح‌شده)
-            atr = get_eurusd_atr(14)
+            # ✅ اصلاح ۲: آستانه جدید — حداقل ۳۰٪ ATR (نه ۱۵ پیپ)
             if atr:
-                # حداقل ۳۰٪ ATR → حرکت واقعی، نه نوسان طبیعی
-                # هرچه زمان بیشتری بگذرد، حرکت قابل قبول‌تر
                 base = atr * 0.30
                 time_factor = 0.5 + 0.5 * min(hours_passed / 12, 1.0)
                 THRESHOLD = round(base * time_factor, 1)
@@ -333,6 +344,7 @@ def verify_predictions():
             else:
                 THRESHOLD = 30
                 print(f"Default threshold: {THRESHOLD} pips")
+
             if abs(change_pips) < THRESHOLD:
                 result = "neutral"
             elif direction == "صعودی" and change_pips > 0:
@@ -484,7 +496,6 @@ def build_indicators_view(indicators):
             sign = "+" if data["change_pct"] >= 0 else ""
             lines.append(f"{arrow} {label}: {data['price']} ({sign}{data['change_pct']}%)")
 
-    # اضافه کردن ATR
     atr = get_eurusd_atr(14)
     if atr:
         lines.append(f"📏 ATR روزانه EUR/USD: {atr} pips")
@@ -592,13 +603,11 @@ def check_volatility_alert(indicators, correlations):
         direction = "صعود" if yields["change_pct"] > 0 else "نزول"
         alerts.append(f"⚠️ نوسان شدید بازده: {direction} {abs(yields['change_pct'])}%")
 
-    # هشدار نوسان نفت
     oil = indicators.get("OIL") if indicators else None
     if oil and abs(oil["change_pct"]) > 3:
         direction = "صعود" if oil["change_pct"] > 0 else "نزول"
         alerts.append(f"🛢️ نوسان شدید نفت: {direction} {abs(oil['change_pct'])}%")
 
-    # هشدار نوسان طلا
     gold = indicators.get("GOLD") if indicators else None
     if gold and abs(gold["change_pct"]) > 1.5:
         direction = "صعود" if gold["change_pct"] > 0 else "نزول"
@@ -743,6 +752,82 @@ def ai_analyze(news_text, calendar_events, bull_score, bear_score,
         return None
 
 
+# ==================================================================
+# ✅ اصلاح ۱: SCORING — sentiment با هوش مصنوعی Groq
+# ==================================================================
+
+def score_sentiment_ai(news_text):
+    """
+    تحلیل احساسات واقعی با Groq — جایگزین کلمات کلیدی.
+    مزایا: context را می‌فهمد، «not dovish» را اشتباه نمی‌گیرد.
+    اگر Groq در دسترس نباشد، fallback به کلمات کلیدی برمی‌گردد.
+    """
+    if not HAS_GROQ:
+        return score_sentiment_keywords(news_text)
+
+    try:
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "تو تحلیل‌گر احساسات بازار EUR/USD هستی. "
+                        "اخبار را می‌خوانی و فقط یک JSON برمی‌گردانی.\n\n"
+                        "قوانین:\n"
+                        "- 'not dovish' یا 'hawkish' یا 'rate hike' = نزول یورو = bear\n"
+                        "- 'dovish' یا 'rate cut' یا 'weak dollar' = صعود یورو = bull\n"
+                        "- 'unlikely' یا 'not' قبل از کلمه، معنی را برعکس کن\n"
+                        "- خبر خنثی یا نامرتبط = 0/0\n"
+                        "- bull و bear بین 0 تا 15\n\n"
+                        "خروجی دقیقاً این فرمت:\n"
+                        '{"bull": عدد, "bear": عدد, "reason": "یک جمله کوتاه"}'
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"این اخبار را تحلیل کن:\n{news_text[:3000]}",
+                },
+            ],
+            temperature=0.2,
+            max_tokens=200,
+        )
+
+        raw = response.choices[0].message.content.strip()
+
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start != -1 and end > start:
+            data = json.loads(raw[start:end])
+            bull = int(data.get("bull", 0))
+            bear = int(data.get("bear", 0))
+            reason = data.get("reason", "")
+
+            bull = max(0, min(15, bull))
+            bear = max(0, min(15, bear))
+
+            print(f"[AI Sentiment] bull={bull} bear={bear} | {reason}")
+            return bull, bear
+
+    except Exception as ex:
+        print("AI sentiment error:", ex)
+
+    print("[AI Sentiment] Fallback to keywords")
+    return score_sentiment_keywords(news_text)
+
+
+def score_sentiment_keywords(text):
+    """روش قدیمی کلمات کلیدی — فقط fallback."""
+    lines = [x.strip().lower() for x in str(text or "").splitlines()
+             if x.strip() and not x.strip().startswith("===")]
+    bull = 0
+    bear = 0
+    for line in lines:
+        bull += sum(1 for k in BULLISH if k in line)
+        bear += sum(1 for k in BEARISH if k in line)
+    return bull, bear
+
+
 # ---------- FETCH ----------
 def fetch_rss(url, n=15):
     out = []
@@ -809,7 +894,6 @@ def fetch_calendar_full():
 
 
 def get_today_events():
-    """گرفتن خبرهای امروز و فردا بر اساس تاریخ تهران - اصلاح‌شده"""
     data = fetch_calendar_full()
     now_teh = datetime.now(TEHRAN_TZ)
     today_teh = now_teh.date()
@@ -821,13 +905,10 @@ def get_today_events():
             continue
         if ev.get("impact") not in ("High", "Medium"):
             continue
-
         dt = parse_event_datetime(ev)
         if not dt:
             continue
-
         event_date_teh = dt.astimezone(TEHRAN_TZ).date()
-
         if event_date_teh == today_teh:
             ev["_is_today"] = True
             ev["_is_tomorrow"] = False
@@ -836,7 +917,6 @@ def get_today_events():
             ev["_is_today"] = False
             ev["_is_tomorrow"] = True
             out.append(ev)
-
     return out
 
 
@@ -936,7 +1016,6 @@ def build_morning_calendar_alert(calendar_events):
         date_fa = now_teh.strftime("%Y-%m-%d %H:%M تهران")
 
     allowed = {x.strip().lower() for x in NEWS_IMPACT_LEVELS}
-    # فقط خبرهای امروز
     events = [ev for ev in calendar_events
               if (ev.get("impact") or "").strip().lower() in allowed
               and ev.get("_is_today")]
@@ -988,7 +1067,8 @@ def build_weekly_report():
     indicators = fetch_market_indicators()
     correlations = fetch_correlation_pairs()
     cot = fetch_cot_data()
-    bull, bear = score_sentiment(news)
+    # ✅ اصلاح ۳: score_sentiment_ai به‌جای score_sentiment
+    bull, bear = score_sentiment_ai(news)
     performance = verify_predictions()
 
     parts = [
@@ -1085,7 +1165,7 @@ def check_breaking_headlines():
                 for e in d.entries[:5]:
                     title = clean_html_text(getattr(e, "title", ""))
                     if not is_relevant_news(title): continue
-                                        import hashlib
+                    # ✅ اصلاح ۳: باگ hash اصلاح شد
                     uid = f"headline_{hashlib.md5(title.lower().encode()).hexdigest()}"
                     if uid in seen: continue
                     seen[uid] = {
@@ -1102,90 +1182,10 @@ def check_breaking_headlines():
         return []
 
 
-# ---------- SCORING ----------
-
-def score_sentiment_ai(news_text):
-    """
-    تحلیل احساسات واقعی با Groq — جایگزین کلمات کلیدی.
-    مزایا: context را می‌فهمد، «not dovish» را اشتباه نمی‌گیرد.
-    اگر Groq در دسترس نباشد، fallback به کلمات کلیدی برمی‌گردد.
-    """
-    # اگر Groq نیست → fallback به روش قدیمی
-    if not HAS_GROQ:
-        return score_sentiment_keywords(news_text)
-
-    try:
-        response = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "تو تحلیل‌گر احساسات بازار EUR/USD هستی. "
-                        "اخبار را می‌خوانی و فقط یک JSON برمی‌گردانی.\n\n"
-                        "قوانین:\n"
-                        "- 'not dovish' یا 'hawkish' یا 'rate hike' = نزول یورو = bear\n"
-                        "- 'dovish' یا 'rate cut' یا 'weak dollar' = صعود یورو = bull\n"
-                        "- 'unlikely' یا 'not' قبل از کلمه، معنی را برعکس کن\n"
-                        "- خبر خنثی یا نامرتبط = 0/0\n"
-                        "- bull و bear بین 0 تا 15\n\n"
-                        "خروجی دقیقاً این فرمت:\n"
-                        '{"bull": عدد, "bear": عدد, "reason": "یک جمله کوتاه"}'
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"این اخبار را تحلیل کن:\n{news_text[:3000]}",
-                },
-            ],
-            temperature=0.2,
-            max_tokens=200,
-        )
-
-        raw = response.choices[0].message.content.strip()
-
-        # پیدا کردن JSON در متن (حتی اگر اضافه داشت)
-        import json as _json
-        start = raw.find("{")
-        end = raw.rfind("}") + 1
-        if start != -1 and end > start:
-            data = _json.loads(raw[start:end])
-            bull = int(data.get("bull", 0))
-            bear = int(data.get("bear", 0))
-            reason = data.get("reason", "")
-
-            # محدود کردن مقادیر
-            bull = max(0, min(15, bull))
-            bear = max(0, min(15, bear))
-
-            print(f"[AI Sentiment] bull={bull} bear={bear} | {reason}")
-            return bull, bear
-
-    except Exception as ex:
-        print("AI sentiment error:", ex)
-
-    # اگر اینجا رسید = خطا داد → fallback
-    print("[AI Sentiment] Fallback to keywords")
-    return score_sentiment_keywords(news_text)
-
-
-def score_sentiment_keywords(text):
-    """روش قدیمی کلمات کلیدی — فقط به‌عنوان fallback نگه داشته شد."""
-    lines = [x.strip().lower() for x in str(text or "").splitlines()
-             if x.strip() and not x.strip().startswith("===")]
-    bull = 0
-    bear = 0
-    for line in lines:
-        bull += sum(1 for k in BULLISH if k in line)
-        bear += sum(1 for k in BEARISH if k in line)
-    return bull, bear
-
-
 # ---------- BUILDERS ----------
 def build_timeframe_view(bull, bear, calendar_events=None, breaking_news=None):
     diff = int(bull) - int(bear)
     calendar_events = calendar_events or []
-    # فقط خبرهای امروز
     today_events = [ev for ev in calendar_events if ev.get("_is_today")]
     high_events_today = [ev for ev in today_events if (ev.get("impact") or "").lower() == "high"]
 
@@ -1198,7 +1198,7 @@ def build_timeframe_view(bull, bear, calendar_events=None, breaking_news=None):
     else:
         instant = "خنثی."
 
-    today_view = "خبرهای قرمز داریم." if high_events_today else "فشار خبری کم."
+    today_view = "خبرهای قرمز داریم." if high_events_today else "فشار خبری کم"
 
     if diff >= 4:
         long_term = "ضعف دلار → حمایت EUR/USD."
@@ -1220,7 +1220,6 @@ def build_currency_strength(bull, bear, calendar_events=None, breaking_news=None
     eur_score = clamp(bull)
     usd_score = clamp(bear)
     calendar_events = calendar_events or []
-    # فقط خبرهای امروز
     today_events = [ev for ev in calendar_events if ev.get("_is_today")]
     high_count = sum(1 for ev in today_events if (ev.get("impact") or "").lower() == "high")
     medium_count = sum(1 for ev in today_events if (ev.get("impact") or "").lower() == "medium")
@@ -1301,14 +1300,11 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل",
         keys = ["خبر مستقیم مهم محدود است."]
     bullets = "\n".join([f"- {k}" for k in keys[:3]])
 
-    # تقویم اقتصادی - جدا کردن امروز و فردا
     calendar_text = "خبر تقویمی مهمی نداریم."
     if calendar_events:
         today_events = [ev for ev in calendar_events if ev.get("_is_today")]
         tomorrow_events = [ev for ev in calendar_events if ev.get("_is_tomorrow")]
-
         cal_lines = []
-
         if today_events:
             cal_lines.append("📅 امروز:")
             for ev in today_events[:3]:
@@ -1316,7 +1312,6 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل",
                     f"  • {event_time_tehran(ev)} | {ev.get('country','')} | "
                     f"{ev.get('impact','')} | {ev.get('title','')}"
                 )
-
         if tomorrow_events:
             if today_events:
                 cal_lines.append("")
@@ -1326,7 +1321,6 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل",
                     f"  • {event_time_tehran(ev)} | {ev.get('country','')} | "
                     f"{ev.get('impact','')} | {ev.get('title','')}"
                 )
-
         if cal_lines:
             calendar_text = "\n".join(cal_lines)
 
@@ -1363,7 +1357,6 @@ def build_brief(news_text, bull, bear, calendar_events, slot_label="تحلیل",
         msg_parts.extend([build_correlation_view(correlations), ""])
     if cot:
         msg_parts.extend([build_cot_view(cot), ""])
-    # از 1 پیش‌بینی نمایش دهد
     if performance and performance.get("total", 0) >= 1:
         msg_parts.extend([build_performance_view(performance), ""])
     msg_parts.extend([
@@ -1413,12 +1406,11 @@ def send_telegram_text(text):
             }, timeout=20)
             print(f"Telegram {i+1}/{len(chunks)}:", r.status_code)
             if not r.ok:
-                all_ok = False
                 r2 = requests.post(url, data={
                     "chat_id": CHAT_ID, "text": chunk,
                     "disable_web_page_preview": True,
                 }, timeout=20)
-                if r2.ok: all_ok = True
+                if not r2.ok: all_ok = False
         except Exception as ex:
             print("Send error:", ex)
             all_ok = False
@@ -1504,7 +1496,6 @@ def run_once(slot="manual"):
         print("[watch] Checking...")
         try:
             verify_predictions()
-
             hits = check_live_news()
             if not hits:
                 headlines = check_breaking_headlines()
@@ -1523,13 +1514,13 @@ def run_once(slot="manual"):
                     for h in hits
                 ])
                 news = breaking_text + "\n" + news
-                bull, bear = score_sentiment(news)
+                # ✅ اصلاح ۳: score_sentiment_ai
+                bull, bear = score_sentiment_ai(news)
                 cal = get_today_events()
                 indicators = fetch_market_indicators()
                 correlations = fetch_correlation_pairs()
                 vol_alert = check_volatility_alert(indicators, correlations)
                 performance = calculate_performance()
-
                 text_msg, voice_text, direction = build_brief(
                     news, bull, bear, cal,
                     slot_label="🔔 خبر فوری",
@@ -1550,12 +1541,12 @@ def run_once(slot="manual"):
         return
 
     print(f"[{slot}] Fetching...")
-
     verify_predictions()
 
     news = fetch_news_all()
     cal = get_today_events()
-    bull, bear = score_sentiment(news)
+    # ✅ اصلاح ۳: score_sentiment_ai به‌جای score_sentiment
+    bull, bear = score_sentiment_ai(news)
     indicators = fetch_market_indicators()
     correlations = fetch_correlation_pairs()
     cot = fetch_cot_data()
