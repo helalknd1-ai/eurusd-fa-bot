@@ -1,1 +1,19 @@
-
+{
+  "20260713_2352_morning": {
+    "timestamp": "2026-07-13T23:52:27.020899+03:30",
+    "date": "2026-07-13",
+    "time": "23:52",
+    "slot": "morning",
+    "direction": "نزولی",
+    "bull_score": 0,
+    "bear_score": 10,
+    "tech_score": -5,
+    "combined_score": -34,
+    "price_at_prediction": 1.1382,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null,
+    "checked_at": null
+  }
+}
