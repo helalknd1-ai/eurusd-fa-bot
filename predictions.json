@@ -73,5 +73,20 @@
     "result": null,
     "price_change_pips": null,
     "checked_at": null
+  },
+  "20260713_0807_manual": {
+    "timestamp": "2026-07-13T08:07:52.446037+03:30",
+    "date": "2026-07-13",
+    "time": "08:07",
+    "slot": "manual",
+    "direction": "نزولی",
+    "bull_score": 0,
+    "bear_score": 8,
+    "price_at_prediction": 1.1405,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null,
+    "checked_at": null
   }
 }
