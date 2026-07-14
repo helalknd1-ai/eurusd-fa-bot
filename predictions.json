@@ -22,5 +22,17 @@
     "verified": false,
     "result": null,
     "price_change_pips": null
+  },
+  "20260714_2039_manual": {
+    "timestamp": "2026-07-14T20:39:42.456044+03:30",
+    "date": "2026-07-14",
+    "slot": "manual",
+    "direction": "صعودی",
+    "confidence": "بالا",
+    "price_at_prediction": 1.143,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
   }
 }
