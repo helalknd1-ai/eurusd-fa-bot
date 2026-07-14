@@ -83,5 +83,22 @@
     "result": null,
     "price_change_pips": null,
     "checked_at": null
+  },
+  "20260714_1601_us_preopen": {
+    "timestamp": "2026-07-14T16:01:17.211716+03:30",
+    "date": "2026-07-14",
+    "time": "16:01",
+    "slot": "us_preopen",
+    "direction": "خنثی",
+    "bull_score": 5,
+    "bear_score": 0,
+    "tech_score": -4,
+    "combined_score": -2,
+    "price_at_prediction": 1.1463,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null,
+    "checked_at": null
   }
 }
