@@ -15,5 +15,22 @@
     "result": null,
     "price_change_pips": null,
     "checked_at": null
+  },
+  "20260714_0731_morning": {
+    "timestamp": "2026-07-14T07:31:17.474610+03:30",
+    "date": "2026-07-14",
+    "time": "07:31",
+    "slot": "morning",
+    "direction": "نزولی",
+    "bull_score": 5,
+    "bear_score": 10,
+    "tech_score": -5,
+    "combined_score": -13,
+    "price_at_prediction": 1.1397,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null,
+    "checked_at": null
   }
 }
