@@ -3,5 +3,30 @@
     "date": "2026-07-14",
     "title": "What is the distribution of forecasts for the US CPI?",
     "sent_at": "2026-07-14 13:35"
+  },
+  "prealert_Core CPI m/m_2026-07-14T08:30:00-04:00": {
+    "date": "2026-07-14",
+    "title": "Core CPI m/m",
+    "sent_at": "2026-07-14 15:31"
+  },
+  "prealert_Core CPI y/y_2026-07-14T08:30:00-04:00": {
+    "date": "2026-07-14",
+    "title": "Core CPI y/y",
+    "sent_at": "2026-07-14 15:31"
+  },
+  "prealert_CPI m/m_2026-07-14T08:30:00-04:00": {
+    "date": "2026-07-14",
+    "title": "CPI m/m",
+    "sent_at": "2026-07-14 15:31"
+  },
+  "prealert_CPI y/y_2026-07-14T08:30:00-04:00": {
+    "date": "2026-07-14",
+    "title": "CPI y/y",
+    "sent_at": "2026-07-14 15:31"
+  },
+  "headline_79f8e8104d4a88a98fdb1d0e1934ef25": {
+    "date": "2026-07-14",
+    "title": "investingLive European FX news wrap: Markets consolidate ahead of the US CPI report",
+    "sent_at": "2026-07-14 15:31"
   }
 }
