@@ -49,5 +49,22 @@
     "result": null,
     "price_change_pips": null,
     "checked_at": null
+  },
+  "20260714_1335_watch": {
+    "timestamp": "2026-07-14T13:35:58.385931+03:30",
+    "date": "2026-07-14",
+    "time": "13:35",
+    "slot": "watch",
+    "direction": "نزولی",
+    "bull_score": 5,
+    "bear_score": 3,
+    "tech_score": -5,
+    "combined_score": -14,
+    "price_at_prediction": 1.1404,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null,
+    "checked_at": null
   }
 }
