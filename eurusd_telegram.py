@@ -105,6 +105,45 @@ SPEECH_INDICATORS = [
     "prepared text", "q&a", "qa", "questions",
 ]
 
+# 🔴 کلماتی که نشان‌دهنده خبر واقعاً فوری/مهم هستند (نه مقاله معمولی)
+BREAKING_KEYWORDS = [
+    # حرکات شدید قیمت
+    "surges", "plunges", "plummets", "spikes", "jumps", "slides",
+    "crashes", "soars", "tumbles", "slumps", "collapses", "skyrockets",
+    "selloff", "sell-off", "rallies", "rally",
+    "sharply lower", "sharply higher", "sharply down", "sharply up",
+    "falls sharply", "rises sharply", "drops sharply", "dives", "nosedives",
+    "tumbles after", "jumps after", "falls after", "rises after", "drops after",
+    "slips", "dumps",
+    # فوریت
+    "breaking", "urgent", "shock", "unexpected", "surprise", "surprisingly",
+    "crisis", "emergency", "alert", "just in",
+    # بانک‌های مرکزی
+    "cuts rates", "raises rates", "rate decision", "rate hike", "rate cut",
+    "emergency cut", "emergency hike", "unexpected rate",
+    # داده‌های اقتصادی
+    "beats expectations", "misses expectations", "comes in", "actual",
+    "surges past", "drops below", "cooler than", "hotter than",
+    # ژئوپلیتیک
+    "attack", "strikes", "sanctions", "invasion", "retaliation",
+    "escalation", "ceasefire", "tariffs imposed", "trade war",
+    # طلا/نفت
+    "oil surges", "oil plunges", "oil crisis", "gold surges",
+    "gold plummets", "crude crashes",
+]
+
+# کلماتی که نشان‌دهنده مقاله معمولی/تحلیلی هستند (نباید فوری حساب شوند)
+ROUTINE_KEYWORDS = [
+    "preview", "outlook", "wrap", "recap", "what to expect",
+    "weekly", "monthly", "analysis", "digest", "roundup",
+    "calendar", "schedule", "watch list", "watchlist",
+    "five things", "things to know", "markets consolidation",
+    "consolidate", "range", "quiet", "calm", "stable",
+    "ahead of", "waiting for", "preparing for", "eyes on",
+    "technical analysis", "chart of the day", "weekly preview",
+    "month ahead", "week ahead", "forecast for",
+]
+
 # دیکشنری سخنرانان (انگلیسی → فارسی)
 SPEAKERS = {
     "powell": "پاول (رئیس فدرال رزرو)",
@@ -346,6 +385,29 @@ def is_speech_related(text):
     """آیا خبر به سخنرانی/اظهارات مربوط است؟"""
     low = clean_html_text(text).lower()
     return any(k in low for k in SPEECH_INDICATORS)
+
+
+def is_breaking_news(text):
+    """
+    آیا این خبر واقعاً فوری/مهم است؟
+    فقط اخباری که کلمه فوری دارند و کلمه معمولی ندارند.
+    این تابع ربات را از اسپم زدن جلوگیری می‌کند.
+    """
+    low = clean_html_text(text).lower()
+
+    # اگر مقاله معمولی است → نه
+    if any(k in low for k in ROUTINE_KEYWORDS):
+        return False
+
+    # اگر سخنرانی است → بله (مهم است)
+    if is_speech_related(text):
+        return True
+
+    # اگر کلمه فوری دارد → بله
+    if any(k in low for k in BREAKING_KEYWORDS):
+        return True
+
+    return False
 
 
 def detect_speaker(text):
@@ -859,7 +921,10 @@ def check_live_news():
 
 
 def check_breaking_headlines():
-    """بررسی تیترهای فوری"""
+    """
+    بررسی تیترهای فوری — فقط خبر واقعاً مهم.
+    مقاله‌های معمولی (preview, wrap, analysis) نادیده گرفته می‌شوند.
+    """
     try:
         urls = [SOURCES["fxstreet_rss"], SOURCES["forexlive"]]
         seen = load_seen()
@@ -868,9 +933,12 @@ def check_breaking_headlines():
         for u in urls:
             try:
                 d = feedparser.parse(u)
-                for e in d.entries[:5]:
+                for e in d.entries[:8]:
                     title = clean_html_text(getattr(e, "title", ""))
                     if not is_relevant_news(title):
+                        continue
+                    # ✅ فقط خبر فوری — نه مقاله معمولی
+                    if not is_breaking_news(title):
                         continue
                     uid = f"hl_{hashlib.md5(title.lower().encode()).hexdigest()}"
                     if uid in seen:
