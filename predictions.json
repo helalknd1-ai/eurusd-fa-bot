@@ -1,1 +1,14 @@
-
+{
+  "20260714_2009_watch": {
+    "timestamp": "2026-07-14T20:09:48.975632+03:30",
+    "date": "2026-07-14",
+    "slot": "watch",
+    "direction": "صعودی",
+    "confidence": "بالا",
+    "price_at_prediction": 1.1438,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
+  }
+}
