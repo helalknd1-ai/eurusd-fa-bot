@@ -7,9 +7,11 @@
     "confidence": "بالا",
     "price_at_prediction": 1.1438,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "neutral",
+    "price_change_pips": 12.0,
+    "price_at_check": 1.145,
+    "threshold_used": 25
   },
   "20260714_2022_watch": {
     "timestamp": "2026-07-14T20:22:49.755557+03:30",
@@ -19,9 +21,11 @@
     "confidence": "بالا",
     "price_at_prediction": 1.1435,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "neutral",
+    "price_change_pips": 15.0,
+    "price_at_check": 1.145,
+    "threshold_used": 25
   },
   "20260714_2039_manual": {
     "timestamp": "2026-07-14T20:39:42.456044+03:30",
