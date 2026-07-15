@@ -46,5 +46,17 @@
     "verified": false,
     "result": null,
     "price_change_pips": null
+  },
+  "20260715_0731_morning": {
+    "timestamp": "2026-07-15T07:31:20.337790+03:30",
+    "date": "2026-07-15",
+    "slot": "morning",
+    "direction": "نزولی",
+    "confidence": "بالا",
+    "price_at_prediction": 1.1442,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
   }
 }
