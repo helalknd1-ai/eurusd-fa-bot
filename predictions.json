@@ -82,5 +82,17 @@
     "verified": false,
     "result": null,
     "price_change_pips": null
+  },
+  "20260715_1131_watch": {
+    "timestamp": "2026-07-15T11:31:31.948891+03:30",
+    "date": "2026-07-15",
+    "slot": "watch",
+    "direction": "نزولی",
+    "confidence": "متوسط",
+    "price_at_prediction": 1.1427,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
   }
 }
