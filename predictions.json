@@ -35,9 +35,11 @@
     "confidence": "بالا",
     "price_at_prediction": 1.143,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "correct",
+    "price_change_pips": 33.0,
+    "price_at_check": 1.1463,
+    "threshold_used": 25
   },
   "20260714_2131_watch": {
     "timestamp": "2026-07-14T21:31:28.660278+03:30",
