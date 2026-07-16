@@ -679,6 +679,10 @@ def save_prediction(direction, confidence, slot, has_news=False):
 
 
 def verify_predictions():
+    """
+    ارزیابی پیش‌بینی‌ها — فقط بعد از ۲۴ ساعت.
+    منطق: ۳۰ پیپ در جهت پیش‌بینی = درست، ۳۰ پیپ خلاف = اشتباه، کمتر = خنثی.
+    """
     predictions = load_json(PREDICTIONS_FILE, {})
     if not predictions:
         return {"total": 0, "correct": 0, "wrong": 0, "neutral": 0, "accuracy": 0}
@@ -687,8 +691,7 @@ def verify_predictions():
     if not current:
         return None
     now = datetime.now(TEHRAN_TZ)
-    atr = get_eurusd_atr(14)
-    threshold = max(25, min(round(atr * 0.35, 1), 100)) if atr else 30
+    threshold = 30.0  # آستانه ثابت ۳۰ پیپ
     changed = False
 
     for pid, pred in predictions.items():
@@ -705,6 +708,7 @@ def verify_predictions():
             change = round((current - old) * 10000, 1)
             d = pred.get("direction", "خنثی")
 
+            # منطق جدید: ۳۰ پیپ ثابت
             if abs(change) < threshold:
                 result = "neutral"
             elif d == "صعودی" and change > 0:
@@ -816,7 +820,7 @@ def event_title_fa(ev):
 
 
 def expected_impact_fa(ev):
-    """اثر احتمالی خبر به فارسی"""
+    """اثر احتمالی خبر به فارسی — با سناریوهای کامل"""
     title = (ev.get("title") or "").lower()
     country = (ev.get("country") or "").upper()
     if country == "USD" and any(k in title for k in ["cpi", "inflation", "pce"]):
@@ -831,7 +835,21 @@ def expected_impact_fa(ev):
         return "تورم بالاتر ← یورو قوی ← صعودی\nتورم پایین‌تر ← یورو ضعیف ← نزولی"
     if country in ["EUR", "EMU"] and any(k in title for k in ["ecb", "lagarde"]):
         return "لحن سخت‌گیرانه بانک مرکزی اروپا ← یورو قوی ← صعودی\nلحن ملایم ← یورو ضعیف ← نزولی"
-    return "عدد واقعی را با پیش‌بینی مقایسه کنید."
+    if any(k in title for k in ["retail sales", "retail"]):
+        return "فروش قوی‌تر از انتظار ← مصرف قوی ← دلار قوی ← نزولی یورو\nفروش ضعیف‌تر ← دلار ضعیف ← صعودی یورو"
+    if any(k in title for k in ["philly", "manufacturing", "ism", "pmi", "industrial"]):
+        return "شاخص بالاتر از انتظار ← تولید قوی ← دلار قوی ← نزولی یورو\nشاخص پایین‌تر ← دلار ضعیف ← صعودی یورو"
+    if any(k in title for k in ["gdp", "growth"]):
+        return "رشد بالاتر ← دلار قوی ← نزولی یورو\nرشد پایین‌تر ← دلار ضعیف ← صعودی یورو"
+    if any(k in title for k in ["consumer sentiment", "consumer confidence"]):
+        return "اعتماد بالاتر ← مصرف قوی ← دلار قوی ← نزولی یورو\nاعتماد پایین‌تر ← دلار ضعیف ← صعودی یورو"
+    if any(k in title for k in ["durable goods", "orders"]):
+        return "سفارشات بالاتر ← دلار قوی ← نزولی یورو\nسفارشات پایین‌تر ← دلار ضعیف ← صعودی یورو"
+    if any(k in title for k in ["housing", "home sales", "building"]):
+        return "داده مسکن قوی ← دلار قوی ← نزولی یورو\nداده ضعیف ← دلار ضعیف ← صعودی یورو"
+    if any(k in title for k in ["trade balance", "current account"]):
+        return "تراز بهتر ← دلار قوی ← نزولی یورو\nتراز بدتر ← دلار ضعیف ← صعودی یورو"
+    return "داده بهتر از انتظار ← دلار قوی ← نزولی یورو\nداده ضعیف‌تر از انتظار ← دلار ضعیف ← صعودی یورو"
 
 
 def event_number(val):
@@ -1119,7 +1137,7 @@ def summarize_speech_ai(speech_texts, speaker_name=""):
 
 
 def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence, performance):
-    """تحلیل جامع فاندامنتال — کاملاً فارسی"""
+    """تحلیل جامع فاندامنتال — کاملاً فارسی و عمیق"""
     if not HAS_GROQ:
         return None
     try:
@@ -1134,19 +1152,41 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
             if acc < 50:
                 perf_note = f"\nنکته: دقت اخیر ربات {acc}٪ است. با احتیاط تحلیل کن."
 
-        prompt = f"""تو تحلیل‌گر فاندامنتال حرفه‌ای یورو/دلار هستی.
+        prompt = f"""تو تحلیل‌گر فاندامنتال حرفه‌ای و باتجربه یورو/دلار هستی.
 فقط بر اساس اخبار و داده‌های اقتصادی تحلیل کن. تکنیکال اصلاً نباید.
 
 {ECON_RULES}
 
 قواعد:
-- حداکثر ۱۰۰ کلمه
+- تحلیل جامع و عمیق (۲۰۰ تا ۳۰۰ کلمه)
 - فقط فارسی
 - بدون کلمه انگلیسی
 - جهت تحلیل باید با امتیاز هم‌خوانی داشته باشد
 
+ساختار تحلیل (مثل یک گزارش حرفه‌ای):
+
+۱) چشم‌انداز کلی (یک پاراگراف):
+- وضعیت فعلی بازار یورو/دلار را توصیف کن
+- مهم‌ترین عامل هدایت‌کننده بازار را مشخص کن
+
+۲) عوامل مؤثر (دو تا سه پاراگراف):
+- هر عامل اقتصادی را با دلیل و منطق توضیح بده
+- علت و معلول را واضح بگو
+- به داده‌های اقتصادی، اخبار بانک مرکزی، ژئوپلیتیک اشاره کن
+
+۳) نبض احساسات بازار (یک خط):
+- آیا بازار ریسک‌پذیر است یا ریسک‌گریز؟
+- دلار تقویت می‌شود یا ضعیف می‌شود؟
+
+۴) چشم‌انداز کوتاه‌مدت (یک پاراگراف):
+- بازار امروز به چه چیزی چشم دوخته است؟
+- چه رویدادی می‌تواند جهت را تغییر دهد؟
+
+۵) توصیه نهایی (یک خط):
+- اقدام عملی معامله‌گر
+
 اخبار:
-{news_text[:2000]}
+{news_text[:2500]}
 
 تقویم اقتصادی:
 {cal_text if cal_text else "خبر مهمی نیست"}
@@ -1155,17 +1195,13 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
 جهت تعیین‌شده: {direction} | اطمینان: {confidence}
 {perf_note}
 
-خروجی دقیقاً:
-- عامل اصلی:
-- تأثیر بر بازار:
-- ریسک:
-- توصیه:"""
+مهم: تحلیل باید عمیق، منطقی و حرفه‌ای باشد. علت و معلول اقتصادی را دقیق بگو."""
 
         resp = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            messages=[{"role": "system", "content": "تو تحلیل‌گر فاندامنتال فارکس هستی. فقط فارسی."},
+            messages=[{"role": "system", "content": "تو تحلیل‌گر فاندامنتال حرفه‌ای فارکس هستی. فقط فارسی. تحلیل‌هایت عمیق و دقیق هستند."},
                       {"role": "user", "content": prompt}],
-            temperature=0.3, max_tokens=350,
+            temperature=0.4, max_tokens=800,
         )
         return resp.choices[0].message.content.strip()
     except Exception as ex:
@@ -1574,9 +1610,9 @@ def run_once(slot="manual"):
                 except Exception as ex:
                     print("خطای خلاصه سخنرانی:", ex)
 
-            # --- ۱۰. ذخیره ---
+            # --- ۱۰. ذخیره (فقط دیدگاه، نه پیش‌بینی رسمی) ---
+            # در طول روز فقط دیدگاه ذخیره می‌شود. پیش‌بینی رسمی فقط صبح ثبت می‌شود.
             save_view(direction, confidence, reason)
-            save_prediction(direction, confidence, slot, has_news=True)
 
             if SEND_VOICE:
                 send_voice(voice)
@@ -1615,8 +1651,9 @@ def run_once(slot="manual"):
     send_text(msg)
 
     save_view(direction, confidence, reason)
-    has_news = bool(cal)
-    save_prediction(direction, confidence, slot, has_news=has_news)
+    if slot == "morning":
+        has_news = bool(cal)
+        save_prediction(direction, confidence, slot, has_news=has_news)
 
     if SEND_VOICE:
         send_voice(voice)
