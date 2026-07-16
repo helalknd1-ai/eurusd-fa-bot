@@ -77,9 +77,11 @@
     "confidence": "متوسط",
     "price_at_prediction": 1.144,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "correct",
+    "price_change_pips": 29.0,
+    "price_at_check": 1.1469,
+    "threshold_used": 25
   },
   "20260715_1031_watch": {
     "timestamp": "2026-07-15T10:31:30.188088+03:30",
