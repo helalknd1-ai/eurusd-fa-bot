@@ -1094,7 +1094,7 @@ def score_sentiment_ai(news_text):
             data = json.loads(raw[s:e])
             bull = max(0, min(15, int(data.get("bull", 0))))
             bear = max(0, min(15, int(data.get("bear", 0))))
-            reason = data.get("reason", "")
+            reason = clean_foreign_chars(data.get("reason", ""))
             print(f"[احساسات] صعودی={bull} نزولی={bear} | {reason}")
             return bull, bear, reason
     except Exception as ex:
@@ -1141,7 +1141,7 @@ def summarize_speech_ai(speech_texts, speaker_name=""):
             ],
             temperature=0.3, max_tokens=500,
         )
-        return resp.choices[0].message.content.strip()
+        return clean_foreign_chars(resp.choices[0].message.content.strip())
     except Exception as ex:
         print("خطا در خلاصه سخنرانی:", ex)
         return None
@@ -1367,20 +1367,28 @@ def build_fundamental_brief(news_text, bull, bear, direction, confidence, reason
     if ai:
         parts.extend(["━━━━━━━━━━━━━━", "🤖 تحلیل:", "", ai, ""])
 
-    # --- تقویم امروز/فردا ---
+    # --- تقویم امروز/فردا (فقط اخبار آینده) ---
     if calendar_events:
-        today = [ev for ev in calendar_events if ev.get("_today")]
-        tomorrow = [ev for ev in calendar_events if ev.get("_tomorrow")]
+        now_te = datetime.now(TEHRAN_TZ)
+        today_upcoming = []
+        tomorrow_ev = []
+        for ev in calendar_events:
+            if ev.get("_today"):
+                dt = parse_event_dt(ev)
+                if dt and dt.astimezone(TEHRAN_TZ) > now_te:
+                    today_upcoming.append(ev)
+            elif ev.get("_tomorrow"):
+                tomorrow_ev.append(ev)
         cal_lines = []
-        if today:
-            cal_lines.append("📅 امروز:")
-            for ev in today[:3]:
+        if today_upcoming:
+            cal_lines.append("📅 اخبار پیش‌رو امروز:")
+            for ev in today_upcoming[:3]:
                 cal_lines.append(f"  • {event_time_fa(ev)} | {country_fa(ev.get('country',''))} | {event_title_fa(ev)}")
-        if tomorrow:
-            if today:
+        if tomorrow_ev:
+            if today_upcoming:
                 cal_lines.append("")
             cal_lines.append("📅 فردا:")
-            for ev in tomorrow[:3]:
+            for ev in tomorrow_ev[:3]:
                 cal_lines.append(f"  • {event_time_fa(ev)} | {country_fa(ev.get('country',''))} | {event_title_fa(ev)}")
         if cal_lines:
             parts.extend(cal_lines)
