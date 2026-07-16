@@ -166,5 +166,17 @@
     "verified": false,
     "result": null,
     "price_change_pips": null
+  },
+  "20260716_1008_manual": {
+    "timestamp": "2026-07-16T10:08:46.632693+03:30",
+    "date": "2026-07-16",
+    "slot": "manual",
+    "direction": "صعودی",
+    "confidence": "بالا",
+    "price_at_prediction": 1.1469,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
   }
 }
