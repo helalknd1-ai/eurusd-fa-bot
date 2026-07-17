@@ -1,1 +1,14 @@
-{}
+{
+  "20260717_0731_morning": {
+    "timestamp": "2026-07-17T07:31:04.237767+03:30",
+    "date": "2026-07-17",
+    "slot": "morning",
+    "direction": "نزولی",
+    "confidence": "بالا",
+    "price_at_prediction": 1.1443,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
+  }
+}
