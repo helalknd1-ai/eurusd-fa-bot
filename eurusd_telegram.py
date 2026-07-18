@@ -1069,7 +1069,7 @@ def score_sentiment_ai(news_text):
         return 0, 0, "هوش مصنوعی در دسترس نیست"
     try:
         resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen-2.5-72b",
             messages=[
                 {"role": "system", "content": (
                     "تو تحلیل‌گر احساسات بازار یورو/دلار هستی. "
@@ -1124,7 +1124,7 @@ def summarize_speech_ai(speech_texts, speaker_name=""):
     try:
         combined = "\n".join(speech_texts)[:3000]
         resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen-2.5-72b",
             messages=[
                 {"role": "system", "content": (
                     "تو تحلیل‌گر اقتصادی حرفه‌ای هستی. متن سخنرانی یا اظهارات مقامات پولی را "
@@ -1209,7 +1209,7 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
 مهم: تحلیل باید عمیق، منطقی و حرفه‌ای باشد. علت و معلول اقتصادی را دقیق بگو."""
 
         resp = groq_client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen-2.5-72b",
             messages=[{"role": "system", "content": "تو تحلیل‌گر فاندامنتال حرفه‌ای فارکس هستی. فقط فارسی. تحلیل‌هایت عمیق و دقیق هستند. هیچ کلمه انگلیسی، چینی یا زبان دیگر استفاده نکن."},
                       {"role": "user", "content": prompt}],
             temperature=0.4, max_tokens=800,
