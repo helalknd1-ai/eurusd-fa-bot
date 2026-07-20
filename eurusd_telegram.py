@@ -4,19 +4,6 @@
 """
 دستیار خبر فاندامنتال یورو/دلار – نسخه نهایی
 فقط فاندامنتال + خلاصه سخنرانی + واکنش سریع + batching هوشمند + پیام‌های انگیزشی
-
-✅ قابلیت‌ها:
-   1) همه اخبار مرتبط یورو/دلار را ارسال می‌کند
-   2) سخنرانی‌های مهم را به فارسی خلاصه می‌کند
-   3) با سرعت به داده‌ها واکنش نشان می‌دهد و تغییر دیدگاه را اطلاع می‌دهد
-   4) اخبار پشت‌سرهم را با هم تحلیل می‌کند (batching)
-   5) پیام‌های انگیزشی و روحیه‌بخش متناسب با وضعیت بازار
-
-❌ حذف شده:
-   - تحلیل تکنیکال
-   - هشدار نوسان شدید
-   - شاخص‌ها و جفت‌ارزهای مرتبط
-   - کلمات انگلیسی در خروجی
 """
 
 import os
@@ -71,6 +58,11 @@ BATCH_FILE = "news_batch.json"
 
 TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
+# ⭐ مدل‌های هوش مصنوعی — به ترتیب امتحان می‌شوند
+AI_MODELS = [
+    "llama-3.3-70b-versatile",  # مدل اصلی (حتماً کار می‌کند)
+]
+
 SCHEDULES = {
     "morning": {"hour": 7, "minute": 30, "label": "🌅 تحلیل صبحگاهی"},
     "us_preopen": {"hour": 16, "minute": 0, "label": "🌆 قبل بازار آمریکا"},
@@ -98,7 +90,6 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9,fa;q=0.8",
 }
 
-# کلمات کلیدی برای تشخیص سخنرانی (انگلیسی - چون اخبار انگلیسی‌اند)
 SPEECH_INDICATORS = [
     "speech", "testimony", "statement", "press conference",
     "says", "speaks", "told", "warns", "urges", "remarks",
@@ -106,8 +97,7 @@ SPEECH_INDICATORS = [
 ]
 
 # ==================================================================
-# قوانین اقتصادی جامع EUR/USD — در همه پرامپت‌ها استفاده می‌شود
-# این قوانین از اشتباهات منطقی هوش مصنوعی جلوگیری می‌کند
+# قوانین اقتصادی جامع EUR/USD
 # ==================================================================
 ECON_RULES = """قوانین اقتصادی EUR/USD (مطلقاً و دقیقاً رعایت کن):
 
@@ -158,9 +148,7 @@ ECON_RULES = """قوانین اقتصادی EUR/USD (مطلقاً و دقیقا�
 - جمله‌ها را تکرار نکن
 - پاراگراف‌های تکراری نساز"""
 
-# 🔴 کلماتی که نشان‌دهنده خبر واقعاً فوری/مهم هستند (نه مقاله معمولی)
 BREAKING_KEYWORDS = [
-    # حرکات شدید قیمت
     "surges", "plunges", "plummets", "spikes", "jumps", "slides",
     "crashes", "soars", "tumbles", "slumps", "collapses", "skyrockets",
     "selloff", "sell-off", "rallies", "rally",
@@ -168,24 +156,18 @@ BREAKING_KEYWORDS = [
     "falls sharply", "rises sharply", "drops sharply", "dives", "nosedives",
     "tumbles after", "jumps after", "falls after", "rises after", "drops after",
     "slips", "dumps",
-    # فوریت
     "breaking", "urgent", "shock", "unexpected", "surprise", "surprisingly",
     "crisis", "emergency", "alert", "just in",
-    # بانک‌های مرکزی
     "cuts rates", "raises rates", "rate decision", "rate hike", "rate cut",
     "emergency cut", "emergency hike", "unexpected rate",
-    # داده‌های اقتصادی
     "beats expectations", "misses expectations", "comes in", "actual",
     "surges past", "drops below", "cooler than", "hotter than",
-    # ژئوپلیتیک
     "attack", "strikes", "sanctions", "invasion", "retaliation",
     "escalation", "ceasefire", "tariffs imposed", "trade war",
-    # طلا/نفت
     "oil surges", "oil plunges", "oil crisis", "gold surges",
     "gold plummets", "crude crashes",
 ]
 
-# کلماتی که نشان‌دهنده مقاله معمولی/تحلیلی هستند (نباید فوری حساب شوند)
 ROUTINE_KEYWORDS = [
     "preview", "outlook", "wrap", "recap", "what to expect",
     "weekly", "monthly", "analysis", "digest", "roundup",
@@ -197,7 +179,6 @@ ROUTINE_KEYWORDS = [
     "month ahead", "week ahead", "forecast for",
 ]
 
-# دیکشنری سخنرانان (انگلیسی → فارسی)
 SPEAKERS = {
     "powell": "پاول (رئیس فدرال رزرو)",
     "warsh": "وارش (رئیس فدرال رزرو)",
@@ -224,13 +205,11 @@ SPEAKERS = {
     "ueda": "اودا (بانک مرکزی ژاپن)",
 }
 
-# ترجمه کشورها
 COUNTRY_FA = {
     "USD": "آمریکا", "EUR": "یوروزون", "EMU": "یوروزون",
     "US": "آمریکا", "EU": "یوروزون",
 }
 
-# ترجمه عناوین خبری رایج
 TITLE_TRANSLATIONS = {
     "core cpi m/m": "تورم هسته‌ای (ماهانه)",
     "core cpi y/y": "تورم هسته‌ای (سالانه)",
@@ -279,7 +258,7 @@ TITLE_TRANSLATIONS = {
 
 
 # ==================================================================
-# بخش ۱: پیام‌های انگیزشی و روحیه‌بخش
+# بخش ۱: پیام‌های انگیزشی
 # ==================================================================
 
 MOTIVATIONAL_GENERAL = [
@@ -336,7 +315,6 @@ MOTIVATION_EVENING = [
 
 
 def get_motivation(direction=None, slot=None, view_changed=False):
-    """انتخاب پیام انگیزشی متناسب با وضعیت"""
     if view_changed:
         return random.choice(MOTIVATION_VIEW_CHANGE)
     if slot == "morning":
@@ -363,10 +341,7 @@ def clean_html_text(text):
 
 
 def clean_foreign_chars(text):
-    """
-    حذف کاراکترهای غیرفارسی و غیرانگلیسی (چینی، هندی، فرانسوی و...).
-    فقط حروف فارسی، انگلیسی، اعداد، نقطه‌گذاری و ایموجی نگه می‌دارد.
-    """
+    """حذف کاراکترهای غیرفارسی و غیرانگلیسی."""
     if not text:
         return ""
     result = []
@@ -394,8 +369,16 @@ def clean_foreign_chars(text):
     return text.strip()
 
 
+def strip_think_tags(text):
+    """حذف افکار پنهان مدل‌های استدلال‌گر (مثل Qwen3)"""
+    if not text:
+        return ""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    text = re.sub(r"<think>.*", "", text, flags=re.DOTALL)
+    return text.strip()
+
+
 def translate_title(title):
-    """ترجمه عنوان خبر به فارسی"""
     low = title.lower().strip()
     for eng, fa in TITLE_TRANSLATIONS.items():
         if eng in low:
@@ -404,7 +387,6 @@ def translate_title(title):
 
 
 def to_fa_digits(text):
-    """تبدیل ارقام انگلیسی به فارسی"""
     fa = "۰۱۲۳۴۵۶۷۸۹"
     for i, d in enumerate("0123456789"):
         text = text.replace(d, fa[i])
@@ -412,7 +394,6 @@ def to_fa_digits(text):
 
 
 def get_date_fa():
-    """تاریخ شمسی"""
     now = datetime.now(TEHRAN_TZ)
     if HAS_JALALI:
         jd = jdatetime.datetime.fromgregorian(datetime=now)
@@ -421,13 +402,11 @@ def get_date_fa():
 
 
 def get_time_fa():
-    """زمان فعلی تهران"""
     now = datetime.now(TEHRAN_TZ)
     return to_fa_digits(now.strftime("%H:%M"))
 
 
 def normalize_voice_text(text):
-    """پاکسازی متن برای صوت"""
     text = str(text or "").strip()
     for ch in ["/", "|", "-", "_", "•", "📌", "📅", "📰", "⚖️",
                "🤖", "🔔", "🌅", "🌆", "🌙", "🟢", "🟡", "🔴",
@@ -442,7 +421,6 @@ def normalize_voice_text(text):
 
 
 def is_relevant_news(text):
-    """آیا خبر به یورو/دلار مربوط است؟"""
     low = clean_html_text(text).lower()
     direct = ["eur/usd", "eurusd", "euro", "usd", "dollar",
               "ecb", "fed", "fomc", "powell", "lagarde", "warsh",
@@ -467,36 +445,22 @@ def is_relevant_news(text):
 
 
 def is_speech_related(text):
-    """آیا خبر به سخنرانی/اظهارات مربوط است؟"""
     low = clean_html_text(text).lower()
     return any(k in low for k in SPEECH_INDICATORS)
 
 
 def is_breaking_news(text):
-    """
-    آیا این خبر واقعاً فوری/مهم است؟
-    فقط اخباری که کلمه فوری دارند و کلمه معمولی ندارند.
-    این تابع ربات را از اسپم زدن جلوگیری می‌کند.
-    """
     low = clean_html_text(text).lower()
-
-    # اگر مقاله معمولی است → نه
     if any(k in low for k in ROUTINE_KEYWORDS):
         return False
-
-    # اگر سخنرانی است → بله (مهم است)
     if is_speech_related(text):
         return True
-
-    # اگر کلمه فوری دارد → بله
     if any(k in low for k in BREAKING_KEYWORDS):
         return True
-
     return False
 
 
 def detect_speaker(text):
-    """تشخیص سخنران از متن خبر (انگلیسی → فارسی)"""
     low = clean_html_text(text).lower()
     for eng, fa in SPEAKERS.items():
         if eng in low:
@@ -585,7 +549,7 @@ def get_eurusd_atr(period=14):
 
 
 # ==================================================================
-# بخش ۵: سیستم ردیابی دیدگاه + تغییر
+# بخش ۵: سیستم ردیابی دیدگاه
 # ==================================================================
 def load_last_view():
     return load_json(LAST_VIEW_FILE, {
@@ -605,7 +569,6 @@ def save_view(direction, confidence, reason):
 
 
 def check_view_change(new_direction, new_reason):
-    """بررسی: آیا دیدگاه ربات تغییر کرده؟"""
     prev = load_last_view()
     prev_dir = prev.get("direction")
     if prev_dir and prev_dir != new_direction and new_direction != "خنثی":
@@ -614,7 +577,7 @@ def check_view_change(new_direction, new_reason):
 
 
 # ==================================================================
-# بخش ۶: سیستم batching هوشمند
+# بخش ۶: سیستم batching
 # ==================================================================
 def load_batch():
     return load_json(BATCH_FILE, {"items": [], "first_time": None, "last_time": None})
@@ -635,11 +598,10 @@ def add_to_batch(news_text):
         batch["first_time"] = now_iso
     batch["items"].append(news_text[:500])
     batch["last_time"] = now_iso
-    save_batch(batch)
+    save_json(batch)
 
 
 def should_wait_for_more_news():
-    """آیا در ۲۵ دقیقه آینده خبر مهمی در راه است؟ اگر بله → صبر کن"""
     try:
         data = fetch_calendar()
         now = datetime.now(TEHRAN_TZ)
@@ -690,10 +652,6 @@ def save_prediction(direction, confidence, slot, has_news=False):
 
 
 def verify_predictions():
-    """
-    ارزیابی پیش‌بینی‌ها — فقط بعد از ۲۴ ساعت.
-    منطق: ۳۰ پیپ در جهت پیش‌بینی = درست، ۳۰ پیپ خلاف = اشتباه، کمتر = خنثی.
-    """
     predictions = load_json(PREDICTIONS_FILE, {})
     if not predictions:
         return {"total": 0, "correct": 0, "wrong": 0, "neutral": 0, "accuracy": 0}
@@ -702,7 +660,7 @@ def verify_predictions():
     if not current:
         return None
     now = datetime.now(TEHRAN_TZ)
-    threshold = 30.0  # آستانه ثابت ۳۰ پیپ
+    threshold = 30.0
     changed = False
 
     for pid, pred in predictions.items():
@@ -719,7 +677,6 @@ def verify_predictions():
             change = round((current - old) * 10000, 1)
             d = pred.get("direction", "خنثی")
 
-            # منطق جدید: ۳۰ پیپ ثابت
             if abs(change) < threshold:
                 result = "neutral"
             elif d == "صعودی" and change > 0:
@@ -831,7 +788,6 @@ def event_title_fa(ev):
 
 
 def expected_impact_fa(ev):
-    """اثر احتمالی خبر به فارسی — با سناریوهای کامل"""
     title = (ev.get("title") or "").lower()
     country = (ev.get("country") or "").upper()
     if country == "USD" and any(k in title for k in ["cpi", "inflation", "pce"]):
@@ -869,7 +825,6 @@ def event_number(val):
 
 
 def released_impact_fa(ev):
-    """اثر خبر منتشرشده"""
     title = (ev.get("title") or "").lower()
     country = (ev.get("country") or "").upper()
     actual = event_number(ev.get("actual"))
@@ -921,7 +876,6 @@ def get_week_events():
 
 
 def check_upcoming_events():
-    """هشدار ۳۰ دقیقه قبل از خبر مهم"""
     try:
         data = fetch_calendar()
         now = datetime.now(TEHRAN_TZ)
@@ -986,7 +940,6 @@ def fetch_all_news():
 
 
 def check_live_news():
-    """بررسی داده‌های اقتصادی منتشرشده"""
     hits = []
     seen = load_seen()
     try:
@@ -1024,10 +977,6 @@ def check_live_news():
 
 
 def check_breaking_headlines():
-    """
-    بررسی تیترهای فوری — فقط خبر واقعاً مهم.
-    مقاله‌های معمولی (preview, wrap, analysis) نادیده گرفته می‌شوند.
-    """
     try:
         urls = [SOURCES["fxstreet_rss"], SOURCES["forexlive"]]
         seen = load_seen()
@@ -1040,7 +989,6 @@ def check_breaking_headlines():
                     title = clean_html_text(getattr(e, "title", ""))
                     if not is_relevant_news(title):
                         continue
-                    # ✅ فقط خبر فوری — نه مقاله معمولی
                     if not is_breaking_news(title):
                         continue
                     uid = f"hl_{hashlib.md5(title.lower().encode()).hexdigest()}"
@@ -1061,36 +1009,58 @@ def check_breaking_headlines():
 
 
 # ==================================================================
-# بخش ۱۰: هوش مصنوعی
+# بخش ۱۰: هوش مصنوعی (با سیستم Fallback)
 # ==================================================================
+def call_groq(messages, temperature, max_tokens):
+    """
+    فراخوانی Groq با سیستم Fallback.
+    مدل‌ها را به ترتیب امتحان می‌کند تا یکی کار کند.
+    """
+    errors = []
+    for model in AI_MODELS:
+        try:
+            resp = groq_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            raw = resp.choices[0].message.content.strip()
+            # حذف افکار پنهان (مدل‌های استدلال‌گر)
+            raw = strip_think_tags(raw)
+            return raw
+        except Exception as ex:
+            err_msg = str(ex)[:150]
+            errors.append(f"{model}: {err_msg}")
+            print(f"⚠️ مدل {model} خطا داد: {err_msg}")
+            continue
+    print(f"❌ همه مدل‌ها خطا دادند: {' | '.join(errors)}")
+    return None
+
+
 def score_sentiment_ai(news_text):
     """تحلیل احساسات با هوش مصنوعی"""
     if not HAS_GROQ:
         return 0, 0, "هوش مصنوعی در دسترس نیست"
     try:
-        resp = groq_client.chat.completions.create(
-            model="qwen/qwen3-32b",
-            messages=[
-                {"role": "system", "content": (
-                    "تو تحلیل‌گر احساسات بازار یورو/دلار هستی. "
-                    "اخبار را می‌خوانی و فقط یک JSON برمی‌گردانی.\n\n"
-                    + ECON_RULES + "\n\n"
-                    "قوانین امتیازدهی:\n"
-                    "- خبر صعودی یورو (دلار ضعیف، کاهش نرخ، تورم پایین آمریکا) = bull\n"
-                    "- خبر نزولی یورو (دلار قوی، افزایش نرخ، تورم بالا آمریکا) = bear\n"
-                    "- کلمات نفی (not, unlikely) معنی را برعکس کن\n"
-                    "- خبر خنثی = 0/0\n"
-                    "- bull و bear بین 0 تا 15\n\n"
-                    'خروجی فقط JSON: {"bull": عدد, "bear": عدد, "reason": "دلیل به فارسی"}'
-                )},
-                {"role": "user", "content": f"این اخبار را تحلیل کن:\n{news_text[:3000]}"},
-            ],
-            temperature=0.2, max_tokens=250,
-        )
-        raw = resp.choices[0].message.content.strip()
-        # ✅ حذف افکار پنهان Qwen3 (تگ <think>...</think>)
-        raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
-        raw = re.sub(r"<think>.*", "", raw, flags=re.DOTALL)
+        messages = [
+            {"role": "system", "content": (
+                "تو تحلیل‌گر احساسات بازار یورو/دلار هستی. "
+                "اخبار را می‌خوانی و فقط یک JSON برمی‌گردانی.\n\n"
+                + ECON_RULES + "\n\n"
+                "قوانین امتیازدهی:\n"
+                "- خبر صعودی یورو (دلار ضعیف، کاهش نرخ، تورم پایین آمریکا) = bull\n"
+                "- خبر نزولی یورو (دلار قوی، افزایش نرخ، تورم بالا آمریکا) = bear\n"
+                "- کلمات نفی (not, unlikely) معنی را برعکس کن\n"
+                "- خبر خنثی = 0/0\n"
+                "- bull و bear بین 0 تا 15\n\n"
+                'خروجی فقط JSON: {"bull": عدد, "bear": عدد, "reason": "دلیل به فارسی"}'
+            )},
+            {"role": "user", "content": f"این اخبار را تحلیل کن:\n{news_text[:3000]}"},
+        ]
+        raw = call_groq(messages, temperature=0.2, max_tokens=250)
+        if not raw:
+            return 0, 0, "تحلیل ممکن نشد"
         s = raw.find("{")
         e = raw.rfind("}") + 1
         if s != -1 and e > s:
@@ -1106,7 +1076,6 @@ def score_sentiment_ai(news_text):
 
 
 def get_direction(bull, bear):
-    """تعیین جهت فقط از فاندامنتال"""
     diff = bull - bear
     if diff >= 4:
         return "صعودی", "بالا"
@@ -1126,29 +1095,24 @@ def summarize_speech_ai(speech_texts, speaker_name=""):
         return None
     try:
         combined = "\n".join(speech_texts)[:3000]
-        resp = groq_client.chat.completions.create(
-            model="qwen/qwen3-32b",
-            messages=[
-                {"role": "system", "content": (
-                    "تو تحلیل‌گر اقتصادی حرفه‌ای هستی. متن سخنرانی یا اظهارات مقامات پولی را "
-                    "به فارسی روان و کوتاه خلاصه می‌کنی.\n\n"
-                    + ECON_RULES + "\n\n"
-                    "خروجی به این شکل:\n"
-                    "۱) سه تا پنج نکته کلیدی (هر کدام یک خط)\n"
-                    "۲) تأثیر بر یورو/دلار (صعودی/نزولی/خنثی) با دلیل منطقی\n\n"
-                    "مهم: همه چیز به فارسی باشد. کلمه انگلیسی نباشد."
-                )},
-                {"role": "user", "content": (
-                    f"این متن را خلاصه کن{' (سخنران: ' + speaker_name + ')' if speaker_name else ''}:\n{combined}"
-                )},
-            ],
-            temperature=0.3, max_tokens=500,
-        )
-        result = resp.choices[0].message.content.strip()
-        # ✅ حذف افکار پنهان Qwen3
-        result = re.sub(r"<think>.*?</think>", "", result, flags=re.DOTALL)
-        result = re.sub(r"<think>.*", "", result, flags=re.DOTALL)
-        return clean_foreign_chars(result)
+        messages = [
+            {"role": "system", "content": (
+                "تو تحلیل‌گر اقتصادی حرفه‌ای هستی. متن سخنرانی یا اظهارات مقامات پولی را "
+                "به فارسی روان و کوتاه خلاصه می‌کنی.\n\n"
+                + ECON_RULES + "\n\n"
+                "خروجی به این شکل:\n"
+                "۱) سه تا پنج نکته کلیدی (هر کدام یک خط)\n"
+                "۲) تأثیر بر یورو/دلار (صعودی/نزولی/خنثی) با دلیل منطقی\n\n"
+                "مهم: همه چیز به فارسی باشد. کلمه انگلیسی نباشد."
+            )},
+            {"role": "user", "content": (
+                f"این متن را خلاصه کن{' (سخنران: ' + speaker_name + ')' if speaker_name else ''}:\n{combined}"
+            )},
+        ]
+        result = call_groq(messages, temperature=0.3, max_tokens=500)
+        if result:
+            return clean_foreign_chars(result)
+        return None
     except Exception as ex:
         print("خطا در خلاصه سخنرانی:", ex)
         return None
@@ -1215,17 +1179,14 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
 
 مهم: تحلیل باید عمیق، منطقی و حرفه‌ای باشد. علت و معلول اقتصادی را دقیق بگو."""
 
-        resp = groq_client.chat.completions.create(
-            model="qwen/qwen3-32b",
-            messages=[{"role": "system", "content": "تو تحلیل‌گر فاندامنتال حرفه‌ای فارکس هستی. فقط فارسی. تحلیل‌هایت عمیق و دقیق هستند. هیچ کلمه انگلیسی، چینی یا زبان دیگر استفاده نکن."},
-                      {"role": "user", "content": prompt}],
-            temperature=0.4, max_tokens=800,
-        )
-        result = resp.choices[0].message.content.strip()
-        # ✅ حذف افکار پنهان Qwen3
-        result = re.sub(r"<think>.*?</think>", "", result, flags=re.DOTALL)
-        result = re.sub(r"<think>.*", "", result, flags=re.DOTALL)
-        return clean_foreign_chars(result)
+        messages = [
+            {"role": "system", "content": "تو تحلیل‌گر فاندامنتال حرفه‌ای فارکس هستی. فقط فارسی. تحلیل‌هایت عمیق و دقیق هستند. هیچ کلمه انگلیسی، چینی یا زبان دیگر استفاده نکن."},
+            {"role": "user", "content": prompt},
+        ]
+        result = call_groq(messages, temperature=0.4, max_tokens=800)
+        if result:
+            return clean_foreign_chars(result)
+        return None
     except Exception as ex:
         print("خطا در تحلیل هوش مصنوعی:", ex)
         return None
@@ -1235,7 +1196,6 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
 # بخش ۱۱: ساخت پیام
 # ==================================================================
 def build_calendar_alert(events):
-    """پیام یادآور اخبار امروز"""
     date_fa, _ = get_date_fa()
     time_fa = get_time_fa()
     today_events = [ev for ev in events if ev.get("_today")]
@@ -1267,7 +1227,6 @@ def build_calendar_alert(events):
 
 
 def build_prealert(events):
-    """هشدار ۳۰ دقیقه قبل از خبر"""
     time_fa = get_time_fa()
     parts = ["⏰ هشدار: خبر مهم در راه است!", "", f"🕒 زمان: {time_fa} تهران", ""]
     for ev in events:
@@ -1293,7 +1252,6 @@ def build_prealert(events):
 
 
 def build_data_release_msg(hits):
-    """پیام انتشار داده اقتصادی"""
     date_fa, _ = get_date_fa()
     time_fa = get_time_fa()
     parts = [f"📊 داده اقتصادی منتشر شد", "", f"{date_fa} - {time_fa} تهران", ""]
@@ -1314,7 +1272,6 @@ def build_data_release_msg(hits):
 
 
 def build_speech_summary(speech_texts, speaker=""):
-    """پیام خلاصه سخنرانی"""
     date_fa, _ = get_date_fa()
     time_fa = get_time_fa()
     summary = summarize_speech_ai(speech_texts, speaker)
@@ -1339,7 +1296,6 @@ def build_fundamental_brief(news_text, bull, bear, direction, confidence, reason
                             calendar_events=None, performance=None,
                             view_changed=False, prev_dir=None, prev_reason="",
                             slot_label="تحلیل فاندامنتال", slot=None):
-    """پیام تحلیل جامع فاندامنتال — کاملاً فارسی"""
     date_fa, date_short = get_date_fa()
     time_fa = get_time_fa()
 
@@ -1357,7 +1313,6 @@ def build_fundamental_brief(news_text, bull, bear, direction, confidence, reason
         "",
     ]
 
-    # --- هشدار تغییر دیدگاه ---
     if view_changed and prev_dir:
         parts.extend([
             "━━━━━━━━━━━━━━",
@@ -1372,12 +1327,10 @@ def build_fundamental_brief(news_text, bull, bear, direction, confidence, reason
         parts.append("⚠️ جهت بازار عوض شده. با احتیاط!")
         parts.append("")
 
-    # --- تحلیل هوش مصنوعی ---
     ai = ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence, performance)
     if ai:
         parts.extend(["━━━━━━━━━━━━━━", "🤖 تحلیل:", "", ai, ""])
 
-    # --- تقویم امروز/فردا (فقط اخبار آینده) ---
     if calendar_events:
         now_te = datetime.now(TEHRAN_TZ)
         today_upcoming = []
@@ -1404,19 +1357,16 @@ def build_fundamental_brief(news_text, bull, bear, direction, confidence, reason
             parts.extend(cal_lines)
             parts.append("")
 
-    # --- عملکرد ---
     if performance and performance.get("total", 0) >= 1:
         parts.append(build_performance_view(performance))
         parts.append("")
 
-    # --- پیام انگیزشی ---
     parts.append(get_motivation(direction=direction, slot=slot, view_changed=view_changed))
     parts.append("")
     parts.append(f"@EURUSDFaBot | {date_short}")
 
     msg = "\n".join(parts)
 
-    # --- متن صوتی ---
     voice_parts = [
         f"تحلیل فاندامنتال یورو دلار، {date_short}.",
         f"جهت: {direction}.",
@@ -1553,7 +1503,6 @@ def run_once(slot="manual"):
             return
 
     if slot == "watch":
-        # --- هشدار پیش از خبر ---
         try:
             upcoming = check_upcoming_events()
             if upcoming:
@@ -1564,7 +1513,6 @@ def run_once(slot="manual"):
             print("خطای هشدار:", e)
 
     if slot == "watch":
-        # --- رصد اخبار فوری ---
         print("[رصد] بررسی...")
         try:
             verify_predictions()
@@ -1575,7 +1523,6 @@ def run_once(slot="manual"):
                 print("[رصد] خبر جدیدی نیست.")
                 return
 
-            # --- تشخیص: آیا این سخنرانی است؟ ---
             all_new_text = ""
             if hits:
                 for h in hits:
@@ -1586,41 +1533,33 @@ def run_once(slot="manual"):
             speaker = detect_speaker(all_new_text)
             is_speech = is_speech_related(all_new_text) or bool(speaker)
 
-            # --- ۱. اگر داده اقتصادی منتشر شده → پیام داده ---
             if hits:
                 send_text(build_data_release_msg(hits))
                 if SEND_VOICE:
                     send_voice("داده اقتصادی جدید منتشر شد.")
 
-            # --- ۲. batching: آیا باید صبر کنیم؟ ---
             wait, next_title = should_wait_for_more_news()
             if wait:
                 print(f"[رصد] خبر '{next_title}' در راه است → صبر می‌کنیم")
                 add_to_batch(all_new_text)
                 return
 
-            # --- ۳. خبرهای batch شده را اضافه کن ---
             batch = load_batch()
             if batch.get("items"):
                 all_new_text = "\n".join(batch["items"]) + "\n" + all_new_text
                 clear_batch()
 
-            # --- ۴. دریافت همه اخبار + تحلیل ---
             news = fetch_all_news()
             full_news = all_new_text + "\n" + "\n".join(news)
 
-            # --- ۵. تحلیل احساسات ---
             bull, bear, reason = score_sentiment_ai(full_news)
             direction, confidence = get_direction(bull, bear)
 
-            # --- ۶. بررسی تغییر دیدگاه ---
             view_changed, prev_dir, prev_reason = check_view_change(direction, reason)
 
-            # --- ۷. تقویم + عملکرد ---
             cal = get_today_events()
             perf_summary = verify_predictions()
 
-            # --- ۸. ساخت پیام ---
             msg, voice = build_fundamental_brief(
                 full_news, bull, bear, direction, confidence, reason,
                 calendar_events=cal, performance=perf_summary,
@@ -1629,7 +1568,6 @@ def run_once(slot="manual"):
             )
             send_text(msg)
 
-            # --- ۹. خلاصه سخنرانی (اگر هست) ---
             if is_speech:
                 try:
                     speech_msg = build_speech_summary([all_new_text] + headlines, speaker)
@@ -1640,8 +1578,6 @@ def run_once(slot="manual"):
                 except Exception as ex:
                     print("خطای خلاصه سخنرانی:", ex)
 
-            # --- ۱۰. ذخیره (فقط دیدگاه، نه پیش‌بینی رسمی) ---
-            # در طول روز فقط دیدگاه ذخیره می‌شود. پیش‌بینی رسمی فقط صبح ثبت می‌شود.
             save_view(direction, confidence, reason)
 
             if SEND_VOICE:
@@ -1651,7 +1587,6 @@ def run_once(slot="manual"):
             print("خطای رصد:", e)
         return
 
-    # --- اسلات‌های عادی (morning, us_preopen, evening, manual) ---
     print(f"[{slot}] در حال دریافت...")
     verify_predictions()
 
@@ -1665,7 +1600,6 @@ def run_once(slot="manual"):
 
     slot_label = SCHEDULES.get(slot, SCHEDULES["manual"])["label"]
 
-    # --- پیام تقویم صبحگاهی ---
     if slot == "morning":
         try:
             send_text(build_calendar_alert(cal))
