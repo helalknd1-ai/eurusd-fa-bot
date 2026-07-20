@@ -1088,6 +1088,9 @@ def score_sentiment_ai(news_text):
             temperature=0.2, max_tokens=250,
         )
         raw = resp.choices[0].message.content.strip()
+        # ✅ حذف افکار پنهان Qwen3 (تگ <think>...</think>)
+        raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
+        raw = re.sub(r"<think>.*", "", raw, flags=re.DOTALL)
         s = raw.find("{")
         e = raw.rfind("}") + 1
         if s != -1 and e > s:
@@ -1141,7 +1144,11 @@ def summarize_speech_ai(speech_texts, speaker_name=""):
             ],
             temperature=0.3, max_tokens=500,
         )
-        return clean_foreign_chars(resp.choices[0].message.content.strip())
+        result = resp.choices[0].message.content.strip()
+        # ✅ حذف افکار پنهان Qwen3
+        result = re.sub(r"<think>.*?</think>", "", result, flags=re.DOTALL)
+        result = re.sub(r"<think>.*", "", result, flags=re.DOTALL)
+        return clean_foreign_chars(result)
     except Exception as ex:
         print("خطا در خلاصه سخنرانی:", ex)
         return None
@@ -1215,6 +1222,9 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
             temperature=0.4, max_tokens=800,
         )
         result = resp.choices[0].message.content.strip()
+        # ✅ حذف افکار پنهان Qwen3
+        result = re.sub(r"<think>.*?</think>", "", result, flags=re.DOTALL)
+        result = re.sub(r"<think>.*", "", result, flags=re.DOTALL)
         return clean_foreign_chars(result)
     except Exception as ex:
         print("خطا در تحلیل هوش مصنوعی:", ex)
