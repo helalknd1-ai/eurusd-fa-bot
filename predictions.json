@@ -12,5 +12,17 @@
     "price_change_pips": 3.0,
     "price_at_check": 1.1446,
     "threshold_used": 30.0
+  },
+  "20260720_0731_morning": {
+    "timestamp": "2026-07-20T07:31:04.938752+03:30",
+    "date": "2026-07-20",
+    "slot": "morning",
+    "direction": "خنثی",
+    "confidence": "پایین",
+    "price_at_prediction": 1.1446,
+    "has_news": false,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
   }
 }
