@@ -722,6 +722,14 @@ def build_performance_view(perf):
     if not perf or perf.get("total", 0) < 1:
         return "🎯 عملکرد ربات:\nهنوز داده کافی نیست."
     acc = perf["accuracy"]
+    correct = perf.get("correct", 0)
+    wrong = perf.get("wrong", 0)
+    neutral = perf.get("neutral", 0)
+    # اگر همه خنثی هستند → هنوز قابل ارزیابی نیست
+    if correct == 0 and wrong == 0 and neutral > 0:
+        return (f"🎯 عملکرد ربات ({to_fa_digits(str(perf['total']))} پیش‌بینی):\n"
+                f"⏳ هنوز پیش‌بینی قطعی نداریم — بازار کمتر از ۳۰ پیپ حرکت کرده.\n"
+                f"⚪ خنثی: {to_fa_digits(str(neutral))}")
     if acc >= 70:
         rating = "🟢 عالی"
     elif acc >= 55:
@@ -733,9 +741,9 @@ def build_performance_view(perf):
     return (
         f"🎯 عملکرد ربات ({to_fa_digits(str(perf['total']))} پیش‌بینی):\n"
         f"{rating} دقت: {to_fa_digits(str(acc))}٪\n"
-        f"✅ درست: {to_fa_digits(str(perf['correct']))} | "
-        f"❌ اشتباه: {to_fa_digits(str(perf['wrong']))} | "
-        f"⚪ خنثی: {to_fa_digits(str(perf['neutral']))}"
+        f"✅ درست: {to_fa_digits(str(correct))} | "
+        f"❌ اشتباه: {to_fa_digits(str(wrong))} | "
+        f"⚪ خنثی: {to_fa_digits(str(neutral))}"
     )
 
 
