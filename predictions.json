@@ -91,9 +91,11 @@
     "confidence": "بالا",
     "price_at_prediction": 1.141,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "neutral",
+    "price_change_pips": 28.0,
+    "price_at_check": 1.1438,
+    "threshold_used": 30.0
   },
   "20260723_0731_morning": {
     "timestamp": "2026-07-23T07:31:02.153990+03:30",
