@@ -105,9 +105,11 @@
     "confidence": "بالا",
     "price_at_prediction": 1.1431,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "correct",
+    "price_change_pips": -47.0,
+    "price_at_check": 1.1384,
+    "threshold_used": 30.0
   },
   "20260724_0730_morning": {
     "timestamp": "2026-07-24T07:30:56.410006+03:30",
