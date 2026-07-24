@@ -122,5 +122,17 @@
     "verified": false,
     "result": null,
     "price_change_pips": null
+  },
+  "20260724_1033_morning": {
+    "timestamp": "2026-07-24T10:33:17.255700+03:30",
+    "date": "2026-07-24",
+    "slot": "morning",
+    "direction": "نزولی",
+    "confidence": "بالا",
+    "price_at_prediction": 1.1391,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
   }
 }
