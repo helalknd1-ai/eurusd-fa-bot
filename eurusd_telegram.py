@@ -796,34 +796,90 @@ def event_title_fa(ev):
 
 
 def expected_impact_fa(ev):
+    """اثر احتمالی خبر به فارسی — با سناریوهای کامل و درست"""
     title = (ev.get("title") or "").lower()
     country = (ev.get("country") or "").upper()
-    if country == "USD" and any(k in title for k in ["cpi", "inflation", "pce"]):
-        return "تورم بالاتر ← دلار قوی ← نزولی یورو\nتورم پایین‌تر ← دلار ضعیف ← صعودی یورو"
-    if country == "USD" and any(k in title for k in ["nfp", "payroll", "employment"]):
+    is_us = country in ("USD", "US")
+    is_eu = country in ("EUR", "EMU", "EU")
+
+    # تورم
+    if any(k in title for k in ["cpi", "inflation", "pce", "hicp"]):
+        if is_us:
+            return "تورم بالاتر ← دلار قوی ← نزولی یورو\nتورم پایین‌تر ← دلار ضعیف ← صعودی یورو"
+        else:
+            return "تورم بالاتر اروپا ← بانک مرکزی سخت‌گیر ← یورو قوی ← صعودی\nتورم پایین‌تر ← یورو ضعیف ← نزولی"
+
+    # اشتغال / بیکاری
+    if any(k in title for k in ["nfp", "payroll", "nonfarm", "non-farm"]):
         return "اشتغال قوی ← دلار قوی ← نزولی یورو\nاشتغال ضعیف ← دلار ضعیف ← صعودی یورو"
-    if country == "USD" and any(k in title for k in ["jobless", "unemployment"]):
-        return "بیکاری بالاتر ← دلار ضعیف ← صعودی یورو\nبیکاری پایین‌تر ← دلار قوی ← نزولی یورو"
-    if country == "USD" and any(k in title for k in ["fomc", "fed", "powell", "warsh"]):
+    if any(k in title for k in ["jobless", "unemployment"]):
+        if is_us:
+            return "بیکاری بالاتر ← دلار ضعیف ← صعودی یورو\nبیکاری پایین‌تر ← دلار قوی ← نزولی یورو"
+        else:
+            return "بیکاری بالاتر اروپا ← یورو ضعیف ← نزولی\nبیکاری پایین‌تر ← یورو قوی ← صعودی"
+
+    # بانک‌های مرکزی
+    if any(k in title for k in ["fomc", "fed", "powell", "warsh"]):
         return "لحن سخت‌گیرانه ← دلار قوی ← نزولی یورو\nلحن ملایم ← دلار ضعیف ← صعودی یورو"
-    if country in ["EUR", "EMU"] and any(k in title for k in ["cpi", "inflation", "hicp"]):
-        return "تورم بالاتر ← یورو قوی ← صعودی\nتورم پایین‌تر ← یورو ضعیف ← نزولی"
-    if country in ["EUR", "EMU"] and any(k in title for k in ["ecb", "lagarde"]):
+    if any(k in title for k in ["ecb", "lagarde", "refinancing", "monetary policy"]):
         return "لحن سخت‌گیرانه بانک مرکزی اروپا ← یورو قوی ← صعودی\nلحن ملایم ← یورو ضعیف ← نزولی"
+
+    # PMI / شاخص مدیران خرید
+    if any(k in title for k in ["philly", "manufacturing", "ism", "pmi", "industrial", "services pmi"]):
+        if is_eu:
+            return "شاخص بالاتر از انتظار ← اقتصاد اروپا قوی ← یورو قوی ← صعودی\nشاخص پایین‌تر ← یورو ضعیف ← نزولی"
+        else:
+            return "شاخص بالاتر از انتظار ← اقتصاد آمریکا قوی ← دلار قوی ← نزولی یورو\nشاخص پایین‌تر ← دلار ضعیف ← صعودی یورو"
+
+    # فروش خرده‌فروشی
     if any(k in title for k in ["retail sales", "retail"]):
-        return "فروش قوی‌تر از انتظار ← مصرف قوی ← دلار قوی ← نزولی یورو\nفروش ضعیف‌تر ← دلار ضعیف ← صعودی یورو"
-    if any(k in title for k in ["philly", "manufacturing", "ism", "pmi", "industrial"]):
-        return "شاخص بالاتر از انتظار ← تولید قوی ← دلار قوی ← نزولی یورو\nشاخص پایین‌تر ← دلار ضعیف ← صعودی یورو"
+        if is_eu:
+            return "فروش قوی‌تر اروپا ← یورو قوی ← صعودی\nفروش ضعیف‌تر ← یورو ضعیف ← نزولی"
+        else:
+            return "فروش قوی‌تر ← مصرف قوی ← دلار قوی ← نزولی یورو\nفروش ضعیف‌تر ← دلار ضعیف ← صعودی یورو"
+
+    # رشد اقتصادی GDP
     if any(k in title for k in ["gdp", "growth"]):
-        return "رشد بالاتر ← دلار قوی ← نزولی یورو\nرشد پایین‌تر ← دلار ضعیف ← صعودی یورو"
+        if is_eu:
+            return "رشد بالاتر اروپا ← یورو قوی ← صعودی\nرشد پایین‌تر ← یورو ضعیف ← نزولی"
+        else:
+            return "رشد بالاتر ← دلار قوی ← نزولی یورو\nرشد پایین‌تر ← دلار ضعیف ← صعودی یورو"
+
+    # اعتماد مصرف‌کننده
     if any(k in title for k in ["consumer sentiment", "consumer confidence"]):
-        return "اعتماد بالاتر ← مصرف قوی ← دلار قوی ← نزولی یورو\nاعتماد پایین‌تر ← دلار ضعیف ← صعودی یورو"
+        if is_eu:
+            return "اعتماد بالاتر اروپا ← یورو قوی ← صعودی\nاعتماد پایین‌تر ← یورو ضعیف ← نزولی"
+        else:
+            return "اعتماد بالاتر ← دلار قوی ← نزولی یورو\nاعتماد پایین‌تر ← دلار ضعیف ← صعودی یورو"
+
+    # کالاهای بادوام / سفارشات
     if any(k in title for k in ["durable goods", "orders"]):
-        return "سفارشات بالاتر ← دلار قوی ← نزولی یورو\nسفارشات پایین‌تر ← دلار ضعیف ← صعودی یورو"
+        if is_eu:
+            return "سفارشات بالاتر اروپا ← یورو قوی ← صعودی\nسفارشات پایین‌تر ← یورو ضعیف ← نزولی"
+        else:
+            return "سفارشات بالاتر ← دلار قوی ← نزولی یورو\nسفارشات پایین‌تر ← دلار ضعیف ← صعودی یورو"
+
+    # مسکن
     if any(k in title for k in ["housing", "home sales", "building"]):
-        return "داده مسکن قوی ← دلار قوی ← نزولی یورو\nداده ضعیف ← دلار ضعیف ← صعودی یورو"
+        if is_eu:
+            return "داده مسکن قوی اروپا ← یورو قوی ← صعودی\nداده ضعیف ← یورو ضعیف ← نزولی"
+        else:
+            return "داده مسکن قوی ← دلار قوی ← نزولی یورو\nداده ضعیف ← دلار ضعیف ← صعودی یورو"
+
+    # تراز تجاری
     if any(k in title for k in ["trade balance", "current account"]):
-        return "تراز بهتر ← دلار قوی ← نزولی یورو\nتراز بدتر ← دلار ضعیف ← صعودی یورو"
+        if is_eu:
+            return "تراز بهتر اروپا ← یورو قوی ← صعودی\nتراز بدتر ← یورو ضعیف ← نزولی"
+        else:
+            return "تراز بهتر ← دلار قوی ← نزولی یورو\nتراز بدتر ← دلار ضعیف ← صعودی یورو"
+
+    # سخنرانی رئیس‌جمهور
+    if any(k in title for k in ["trump", "president"]):
+        return "بسته به محتوا:\nهاوکیش (تعرفه/سخت‌گیر) ← دلار قوی ← نزولی یورو\nداویش (ملایم) ← دلار ضعیف ← صعودی یورو"
+
+    # پیش‌فرض
+    if is_eu:
+        return "داده بهتر از انتظار اروپا ← یورو قوی ← صعودی\nداده ضعیف‌تر ← یورو ضعیف ← نزولی"
     return "داده بهتر از انتظار ← دلار قوی ← نزولی یورو\nداده ضعیف‌تر از انتظار ← دلار ضعیف ← صعودی یورو"
 
 
