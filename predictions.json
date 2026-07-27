@@ -119,9 +119,11 @@
     "confidence": "بالا",
     "price_at_prediction": 1.1386,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "neutral",
+    "price_change_pips": 20.0,
+    "price_at_check": 1.1406,
+    "threshold_used": 30.0
   },
   "20260724_1033_morning": {
     "timestamp": "2026-07-24T10:33:17.255700+03:30",
@@ -130,6 +132,20 @@
     "direction": "نزولی",
     "confidence": "بالا",
     "price_at_prediction": 1.1391,
+    "has_news": true,
+    "verified": true,
+    "result": "neutral",
+    "price_change_pips": 15.0,
+    "price_at_check": 1.1406,
+    "threshold_used": 30.0
+  },
+  "20260727_0730_morning": {
+    "timestamp": "2026-07-27T07:30:55.734805+03:30",
+    "date": "2026-07-27",
+    "slot": "morning",
+    "direction": "صعودی",
+    "confidence": "بالا",
+    "price_at_prediction": 1.1406,
     "has_news": true,
     "verified": false,
     "result": null,
