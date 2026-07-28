@@ -147,6 +147,20 @@
     "confidence": "بالا",
     "price_at_prediction": 1.1406,
     "has_news": true,
+    "verified": true,
+    "result": "neutral",
+    "price_change_pips": -29.0,
+    "price_at_check": 1.1377,
+    "threshold_used": 30.0
+  },
+  "20260728_0731_morning": {
+    "timestamp": "2026-07-28T07:31:10.317923+03:30",
+    "date": "2026-07-28",
+    "slot": "morning",
+    "direction": "نزولی",
+    "confidence": "بالا",
+    "price_at_prediction": 1.1377,
+    "has_news": true,
     "verified": false,
     "result": null,
     "price_change_pips": null
