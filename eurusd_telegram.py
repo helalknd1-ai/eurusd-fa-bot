@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-دستیار خبر فاندامنتال یورو/دلار – نسخه نهایی
-فقط فاندامنتال + خلاصه سخنرانی + واکنش سریع + batching هوشمند + پیام‌های انگیزشی
+دستیار خبر فاندامنتال یورو/دلار – نسخه نهایی (ارتقا یافته برای تریدرها)
+اضافه شدن: بازارهای موازی (DXY, طلا، اوراق)، روایت بازار، محاسبه دقیق انحراف داده‌ها، هشدارهای نقدینگی
 """
 
 import os
@@ -51,6 +51,12 @@ VOICE_PITCH = os.getenv("VOICE_PITCH", "+0Hz")
 
 NEWS_IMPACT_LEVELS = os.getenv("NEWS_IMPACT", "High,Medium").split(",")
 
+# 💡 روایت غالب بازار (تغییر بر اساس شرایط فعلی جهان)
+CURRENT_NARRATIVE = os.getenv(
+    "MARKET_NARRATIVE", 
+    "تمرکز اصلی بازار روی تورم آمریکا و مسیر کاهش نرخ بهره فدرال رزرو است. همچنین ریسک‌های ژئوپلیتیک می‌تواند باعث تقاضای پناهگاه امن برای دلار شود."
+)
+
 SEEN_FILE = "seen_events.json"
 PREDICTIONS_FILE = "predictions.json"
 LAST_VIEW_FILE = "last_view.json"
@@ -58,9 +64,9 @@ BATCH_FILE = "news_batch.json"
 
 TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
-# ⭐ مدل‌های هوش مصنوعی — به ترتیب امتحان می‌شوند
+# ⭐ مدل‌های هوش مصنوعی
 AI_MODELS = [
-    "llama-3.3-70b-versatile",  # مدل اصلی (حتماً کار می‌کند)
+    "llama-3.3-70b-versatile",
 ]
 
 SCHEDULES = {
@@ -256,7 +262,6 @@ TITLE_TRANSLATIONS = {
     "producer price index": "شاخص قیمت تولیدکننده",
 }
 
-
 # ==================================================================
 # بخش ۱: پیام‌های انگیزشی
 # ==================================================================
@@ -313,7 +318,6 @@ MOTIVATION_EVENING = [
     "💫 استراحت کن — بازار فردا هم باز است.",
 ]
 
-
 def get_motivation(direction=None, slot=None, view_changed=False):
     if view_changed:
         return random.choice(MOTIVATION_VIEW_CHANGE)
@@ -329,7 +333,6 @@ def get_motivation(direction=None, slot=None, view_changed=False):
         return random.choice(MOTIVATIONAL_NEUTRAL)
     return random.choice(MOTIVATIONAL_GENERAL)
 
-
 # ==================================================================
 # بخش ۲: توابع کمکی
 # ==================================================================
@@ -339,9 +342,7 @@ def clean_html_text(text):
     except Exception:
         return str(text or "").strip()
 
-
 def clean_foreign_chars(text):
-    """حذف کاراکترهای غیرفارسی و غیرانگلیسی."""
     if not text:
         return ""
     result = []
@@ -368,15 +369,12 @@ def clean_foreign_chars(text):
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
-
 def strip_think_tags(text):
-    """حذف افکار پنهان مدل‌های استدلال‌گر (مثل Qwen3)"""
     if not text:
         return ""
     text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
     text = re.sub(r"<think>.*", "", text, flags=re.DOTALL)
     return text.strip()
-
 
 def translate_title(title):
     low = title.lower().strip()
@@ -385,26 +383,37 @@ def translate_title(title):
             return fa
     return title
 
-
 def to_fa_digits(text):
     fa = "۰۱۲۳۴۵۶۷۸۹"
     for i, d in enumerate("0123456789"):
         text = text.replace(d, fa[i])
     return text
 
+WEEKDAYS_FA = {
+    "Monday": "دوشنبه",
+    "Tuesday": "سه‌شنبه",
+    "Wednesday": "چهارشنبه",
+    "Thursday": "پنج‌شنبه",
+    "Friday": "جمعه",
+    "Saturday": "شنبه",
+    "Sunday": "یکشنبه"
+}
 
 def get_date_fa():
     now = datetime.now(TEHRAN_TZ)
+    wd_en = now.strftime("%A")
+    wd_fa = WEEKDAYS_FA.get(wd_en, wd_en)
     if HAS_JALALI:
         jd = jdatetime.datetime.fromgregorian(datetime=now)
-        return jd.strftime("%A %d %B %Y"), jd.strftime("%d %B")
-    return now.strftime("%Y-%m-%d"), now.strftime("%d %b")
-
+        day = jd.strftime("%d")
+        month_en = jd.strftime("%B")
+        year = jd.strftime("%Y")
+        return f"{wd_fa} {day} {month_en} {year}", f"{day} {month_en}"
+    return f"{wd_fa} {now.strftime('%Y-%m-%d')}", f"{now.strftime('%d %b')}"
 
 def get_time_fa():
     now = datetime.now(TEHRAN_TZ)
     return to_fa_digits(now.strftime("%H:%M"))
-
 
 def normalize_voice_text(text):
     text = str(text or "").strip()
@@ -413,12 +422,11 @@ def normalize_voice_text(text):
                "🚨", "📊", "⏰", "🔄", "🎤", "💡", "✅", "❌", "⚪",
                "━", "💪", "📉", "📈", "💎", "🎯", "⚡", "🌟", "🏔️",
                "🔮", "🛡️", "🌈", "🚀", "✨", "🌊", "🧠", "🧘",
-               "⏳", "☀️", "🌄", "🔭", "💫", "👤"]:
+               "⏳", "☀️", "🌄", "🔭", "💫", "👤", "🌐"]:
         text = text.replace(ch, " ")
     text = text.replace("ي", "ی").replace("ك", "ک")
     text = re.sub(r"\s+", " ", text).strip()
     return text
-
 
 def is_relevant_news(text):
     low = clean_html_text(text).lower()
@@ -443,11 +451,9 @@ def is_relevant_news(text):
         return True
     return False
 
-
 def is_speech_related(text):
     low = clean_html_text(text).lower()
     return any(k in low for k in SPEECH_INDICATORS)
-
 
 def is_breaking_news(text):
     low = clean_html_text(text).lower()
@@ -459,14 +465,12 @@ def is_breaking_news(text):
         return True
     return False
 
-
 def detect_speaker(text):
     low = clean_html_text(text).lower()
     for eng, fa in SPEAKERS.items():
         if eng in low:
             return fa
     return ""
-
 
 # ==================================================================
 # بخش ۳: مدیریت فایل
@@ -480,7 +484,6 @@ def load_json(filepath, default=None):
         print(f"خطا در خواندن {filepath}:", ex)
     return default if default is not None else {}
 
-
 def save_json(filepath, data):
     try:
         with open(filepath, "w", encoding="utf-8") as f:
@@ -488,19 +491,16 @@ def save_json(filepath, data):
     except Exception as ex:
         print(f"خطا در نوشتن {filepath}:", ex)
 
-
 def load_seen():
     data = load_json(SEEN_FILE, {})
     today = datetime.now(TEHRAN_TZ).strftime("%Y-%m-%d")
     return {k: v for k, v in data.items() if v.get("date", "").startswith(today)}
 
-
 def save_seen(seen):
     save_json(SEEN_FILE, seen)
 
-
 # ==================================================================
-# بخش ۴: قیمت + ATR
+# بخش ۴: قیمت + ATR + بازارهای موازی
 # ==================================================================
 def get_eurusd_price():
     try:
@@ -518,6 +518,22 @@ def get_eurusd_price():
         print("خطا در دریافت قیمت:", ex)
     return None
 
+def get_market_assets():
+    """دریافت قیمت لحظه‌ای بازارهای موازی (شاخص دلار، اوراق 10 ساله، طلا)"""
+    assets = {"DXY (شاخص دلار)": "DX-Y.NYB", "US10Y (اوراق 10 ساله)": "^TNX", "Gold (طلا)": "GC=F"}
+    results = {}
+    for name, ticker in assets.items():
+        try:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+            r = requests.get(url, headers=HEADERS, timeout=5)
+            if r.status_code == 200:
+                data = r.json()
+                price = data.get("chart", {}).get("result", [])[0].get("meta", {}).get("regularMarketPrice")
+                if price:
+                    results[name] = round(price, 3)
+        except Exception:
+            pass
+    return results
 
 def get_eurusd_atr(period=14):
     try:
@@ -545,8 +561,7 @@ def get_eurusd_atr(period=14):
             trs.append(max(h - l, abs(h - pc), abs(l - pc)))
         return round(sum(trs[-period:]) / period * 10000, 1)
     except Exception:
-        return None
-
+        return None    
 
 # ==================================================================
 # بخش ۵: سیستم ردیابی دیدگاه
@@ -557,7 +572,6 @@ def load_last_view():
         "reason": None, "timestamp": None
     })
 
-
 def save_view(direction, confidence, reason):
     now = datetime.now(TEHRAN_TZ)
     save_json(LAST_VIEW_FILE, {
@@ -567,7 +581,6 @@ def save_view(direction, confidence, reason):
         "timestamp": now.isoformat(),
     })
 
-
 def check_view_change(new_direction, new_reason):
     prev = load_last_view()
     prev_dir = prev.get("direction")
@@ -575,21 +588,17 @@ def check_view_change(new_direction, new_reason):
         return True, prev_dir, prev.get("reason", "")
     return False, prev_dir, ""
 
-
 # ==================================================================
 # بخش ۶: سیستم batching
 # ==================================================================
 def load_batch():
     return load_json(BATCH_FILE, {"items": [], "first_time": None, "last_time": None})
 
-
 def save_batch(batch):
     save_json(BATCH_FILE, batch)
 
-
 def clear_batch():
     save_json(BATCH_FILE, {"items": [], "first_time": None, "last_time": None})
-
 
 def add_to_batch(news_text):
     batch = load_batch()
@@ -599,7 +608,6 @@ def add_to_batch(news_text):
     batch["items"].append(news_text[:500])
     batch["last_time"] = now_iso
     save_json(batch)
-
 
 def should_wait_for_more_news():
     try:
@@ -619,7 +627,6 @@ def should_wait_for_more_news():
         return False, None
     except Exception:
         return False, None
-
 
 # ==================================================================
 # بخش ۷: یادگیری از خطا
@@ -650,17 +657,16 @@ def save_prediction(direction, confidence, slot, has_news=False):
     save_json(PREDICTIONS_FILE, predictions)
     print(f"پیش‌بینی ذخیره شد: {pid} - {direction}")
 
-
 def verify_predictions():
     predictions = load_json(PREDICTIONS_FILE, {})
     if not predictions:
-        return {"total": 0, "correct": 0, "wrong": 0, "neutral": 0, "accuracy": 0}
+        return {"total": 0, "decisive": 0, "correct": 0, "wrong": 0, "neutral": 0, "accuracy": 0}
 
     current = get_eurusd_price()
     if not current:
         return None
     now = datetime.now(TEHRAN_TZ)
-    threshold = 30.0
+    threshold = 20.0
     changed = False
 
     for pid, pred in predictions.items():
@@ -701,35 +707,47 @@ def verify_predictions():
         save_json(PREDICTIONS_FILE, predictions)
     return calculate_perf_from_json(predictions)
 
-
 def calculate_perf_from_json(predictions=None):
     if predictions is None:
         predictions = load_json(PREDICTIONS_FILE, {})
     verified = [p for p in predictions.values() if p.get("verified")]
     total = len(verified)
+    
     if total == 0:
-        return {"total": 0, "correct": 0, "wrong": 0, "neutral": 0, "accuracy": 0}
+        return {"total": 0, "decisive": 0, "correct": 0, "wrong": 0, "neutral": 0, "accuracy": 0}
+        
     correct = sum(1 for p in verified if p["result"] == "correct")
+    wrong = sum(1 for p in verified if p["result"] == "wrong")
+    neutral = sum(1 for p in verified if p["result"] == "neutral")
+    
+    decisive = correct + wrong
+    accuracy = round(correct / decisive * 100, 1) if decisive > 0 else 0
+    
     return {
-        "total": total, "correct": correct,
-        "wrong": sum(1 for p in verified if p["result"] == "wrong"),
-        "neutral": sum(1 for p in verified if p["result"] == "neutral"),
-        "accuracy": round(correct / total * 100, 1),
+        "total": total, 
+        "decisive": decisive, 
+        "correct": correct,
+        "wrong": wrong, 
+        "neutral": neutral, 
+        "accuracy": accuracy,
     }
-
 
 def build_performance_view(perf):
     if not perf or perf.get("total", 0) < 1:
         return "🎯 عملکرد ربات:\nهنوز داده کافی نیست."
-    acc = perf["accuracy"]
+        
+    acc = perf.get("accuracy", 0)
     correct = perf.get("correct", 0)
     wrong = perf.get("wrong", 0)
     neutral = perf.get("neutral", 0)
-    # اگر همه خنثی هستند → هنوز قابل ارزیابی نیست
-    if correct == 0 and wrong == 0 and neutral > 0:
-        return (f"🎯 عملکرد ربات ({to_fa_digits(str(perf['total']))} پیش‌بینی):\n"
-                f"⏳ هنوز پیش‌بینی قطعی نداریم — بازار کمتر از ۳۰ پیپ حرکت کرده.\n"
+    decisive = perf.get("decisive", correct + wrong)
+    total = perf.get("total", 0)
+    
+    if decisive == 0:
+        return (f"🎯 عملکرد ربات ({to_fa_digits(str(total))} پیش‌بینی):\n"
+                f"⏳ هنوز پیش‌بینی قطعی نداریم — بازار کمتر از ۲۰ پیپ حرکت کرده.\n"
                 f"⚪ خنثی: {to_fa_digits(str(neutral))}")
+                
     if acc >= 70:
         rating = "🟢 عالی"
     elif acc >= 55:
@@ -738,15 +756,14 @@ def build_performance_view(perf):
         rating = "🟠 متوسط"
     else:
         rating = "🔴 در حال یادگیری"
+        
     return (
-        f"🎯 عملکرد ربات ({to_fa_digits(str(perf['total']))} پیش‌بینی):\n"
-        f"{rating} دقت: {to_fa_digits(str(acc))}٪\n"
+        f"🎯 عملکرد ربات ({to_fa_digits(str(total))} پیش‌بینی):\n"
+        f"{rating} دقت: {to_fa_digits(str(acc))}٪ (مبتنی بر {to_fa_digits(str(decisive))} سیگنال قطعی)\n"
         f"✅ درست: {to_fa_digits(str(correct))} | "
         f"❌ اشتباه: {to_fa_digits(str(wrong))} | "
         f"⚪ خنثی: {to_fa_digits(str(neutral))}"
     )
-
-
 # ==================================================================
 # بخش ۸: تقویم اقتصادی
 # ==================================================================
@@ -757,7 +774,6 @@ def fetch_calendar():
         return r.json()
     except Exception:
         return []
-
 
 def parse_event_dt(ev):
     raw = (ev.get("date") or "").strip()
@@ -771,13 +787,11 @@ def parse_event_dt(ev):
     except Exception:
         return None
 
-
 def event_time_fa(ev):
     dt = parse_event_dt(ev)
     if dt:
         return to_fa_digits(dt.astimezone(TEHRAN_TZ).strftime("%H:%M"))
     return to_fa_digits(ev.get("time", "نامشخص"))
-
 
 def impact_fa(impact):
     impact = (impact or "").strip().lower()
@@ -786,30 +800,23 @@ def impact_fa(impact):
     elif impact == "low": return "🟢 کم"
     return "⚪ نامشخص"
 
-
 def country_fa(country):
     return COUNTRY_FA.get((country or "").upper(), country or "")
-
 
 def event_title_fa(ev):
     return translate_title(ev.get("title", ""))
 
-
 def expected_impact_fa(ev):
-    """اثر احتمالی خبر به فارسی — با سناریوهای کامل و درست"""
     title = (ev.get("title") or "").lower()
     country = (ev.get("country") or "").upper()
     is_us = country in ("USD", "US")
     is_eu = country in ("EUR", "EMU", "EU")
 
-    # تورم
     if any(k in title for k in ["cpi", "inflation", "pce", "hicp"]):
         if is_us:
             return "تورم بالاتر ← دلار قوی ← نزولی یورو\nتورم پایین‌تر ← دلار ضعیف ← صعودی یورو"
         else:
             return "تورم بالاتر اروپا ← بانک مرکزی سخت‌گیر ← یورو قوی ← صعودی\nتورم پایین‌تر ← یورو ضعیف ← نزولی"
-
-    # اشتغال / بیکاری
     if any(k in title for k in ["nfp", "payroll", "nonfarm", "non-farm"]):
         return "اشتغال قوی ← دلار قوی ← نزولی یورو\nاشتغال ضعیف ← دلار ضعیف ← صعودی یورو"
     if any(k in title for k in ["jobless", "unemployment"]):
@@ -817,76 +824,54 @@ def expected_impact_fa(ev):
             return "بیکاری بالاتر ← دلار ضعیف ← صعودی یورو\nبیکاری پایین‌تر ← دلار قوی ← نزولی یورو"
         else:
             return "بیکاری بالاتر اروپا ← یورو ضعیف ← نزولی\nبیکاری پایین‌تر ← یورو قوی ← صعودی"
-
-    # بانک‌های مرکزی
     if any(k in title for k in ["fomc", "fed", "powell", "warsh"]):
         return "لحن سخت‌گیرانه ← دلار قوی ← نزولی یورو\nلحن ملایم ← دلار ضعیف ← صعودی یورو"
     if any(k in title for k in ["ecb", "lagarde", "refinancing", "monetary policy"]):
         return "لحن سخت‌گیرانه بانک مرکزی اروپا ← یورو قوی ← صعودی\nلحن ملایم ← یورو ضعیف ← نزولی"
-
-    # PMI / شاخص مدیران خرید
     if any(k in title for k in ["philly", "manufacturing", "ism", "pmi", "industrial", "services pmi"]):
         if is_eu:
             return "شاخص بالاتر از انتظار ← اقتصاد اروپا قوی ← یورو قوی ← صعودی\nشاخص پایین‌تر ← یورو ضعیف ← نزولی"
         else:
             return "شاخص بالاتر از انتظار ← اقتصاد آمریکا قوی ← دلار قوی ← نزولی یورو\nشاخص پایین‌تر ← دلار ضعیف ← صعودی یورو"
-
-    # فروش خرده‌فروشی
     if any(k in title for k in ["retail sales", "retail"]):
         if is_eu:
             return "فروش قوی‌تر اروپا ← یورو قوی ← صعودی\nفروش ضعیف‌تر ← یورو ضعیف ← نزولی"
         else:
             return "فروش قوی‌تر ← مصرف قوی ← دلار قوی ← نزولی یورو\nفروش ضعیف‌تر ← دلار ضعیف ← صعودی یورو"
-
-    # رشد اقتصادی GDP
     if any(k in title for k in ["gdp", "growth"]):
         if is_eu:
             return "رشد بالاتر اروپا ← یورو قوی ← صعودی\nرشد پایین‌تر ← یورو ضعیف ← نزولی"
         else:
             return "رشد بالاتر ← دلار قوی ← نزولی یورو\nرشد پایین‌تر ← دلار ضعیف ← صعودی یورو"
-
-    # اعتماد مصرف‌کننده
     if any(k in title for k in ["consumer sentiment", "consumer confidence"]):
         if is_eu:
             return "اعتماد بالاتر اروپا ← یورو قوی ← صعودی\nاعتماد پایین‌تر ← یورو ضعیف ← نزولی"
         else:
             return "اعتماد بالاتر ← دلار قوی ← نزولی یورو\nاعتماد پایین‌تر ← دلار ضعیف ← صعودی یورو"
-
-    # کالاهای بادوام / سفارشات
     if any(k in title for k in ["durable goods", "orders"]):
         if is_eu:
             return "سفارشات بالاتر اروپا ← یورو قوی ← صعودی\nسفارشات پایین‌تر ← یورو ضعیف ← نزولی"
         else:
             return "سفارشات بالاتر ← دلار قوی ← نزولی یورو\nسفارشات پایین‌تر ← دلار ضعیف ← صعودی یورو"
-
-    # مسکن
     if any(k in title for k in ["housing", "home sales", "building"]):
         if is_eu:
             return "داده مسکن قوی اروپا ← یورو قوی ← صعودی\nداده ضعیف ← یورو ضعیف ← نزولی"
         else:
             return "داده مسکن قوی ← دلار قوی ← نزولی یورو\nداده ضعیف ← دلار ضعیف ← صعودی یورو"
-
-    # تراز تجاری
     if any(k in title for k in ["trade balance", "current account"]):
         if is_eu:
             return "تراز بهتر اروپا ← یورو قوی ← صعودی\nتراز بدتر ← یورو ضعیف ← نزولی"
         else:
             return "تراز بهتر ← دلار قوی ← نزولی یورو\nتراز بدتر ← دلار ضعیف ← صعودی یورو"
-
-    # سخنرانی رئیس‌جمهور
     if any(k in title for k in ["trump", "president"]):
         return "بسته به محتوا:\nهاوکیش (تعرفه/سخت‌گیر) ← دلار قوی ← نزولی یورو\nداویش (ملایم) ← دلار ضعیف ← صعودی یورو"
-
-    # پیش‌فرض
     if is_eu:
         return "داده بهتر از انتظار اروپا ← یورو قوی ← صعودی\nداده ضعیف‌تر ← یورو ضعیف ← نزولی"
     return "داده بهتر از انتظار ← دلار قوی ← نزولی یورو\nداده ضعیف‌تر از انتظار ← دلار ضعیف ← صعودی یورو"
 
-
 def event_number(val):
     m = re.search(r"[-+]?\d+(?:\.\d+)?", str(val or "").replace(",", ""))
     return float(m.group()) if m else None
-
 
 def released_impact_fa(ev):
     title = (ev.get("title") or "").lower()
@@ -895,17 +880,22 @@ def released_impact_fa(ev):
     forecast = event_number(ev.get("forecast"))
     if actual is None or forecast is None:
         return "داده واقعی/پیش‌بینی در دسترس نیست."
+        
+    # محاسبه انحراف (Deviation)
+    diff = round(actual - forecast, 2)
+    diff_text = f"انحراف از پیش‌بینی: {diff:+} | "
+    
     if actual == forecast:
-        return "عدد واقعی مطابق پیش‌بینی ← اثر خنثی."
+        return diff_text + "عدد واقعی مطابق پیش‌بینی ← اثر خنثی."
+        
     higher = actual > forecast
     if country == "USD" and any(k in title for k in ["jobless", "unemployment"]):
-        return "بیکاری بالاتر از انتظار ← دلار ضعیف ← صعودی یورو." if higher else "بیکاری پایین‌تر ← دلار قوی ← نزولی یورو."
+        return diff_text + ("بیکاری بالاتر از انتظار ← دلار ضعیف ← صعودی یورو." if higher else "بیکاری پایین‌تر ← دلار قوی ← نزولی یورو.")
     if country == "USD":
-        return "داده آمریکا قوی‌تر از انتظار ← دلار قوی ← نزولی یورو." if higher else "داده آمریکا ضعیف‌تر ← دلار ضعیف ← صعودی یورو."
+        return diff_text + ("داده آمریکا قوی‌تر از انتظار ← دلار قوی ← نزولی یورو." if higher else "داده آمریکا ضعیف‌تر ← دلار ضعیف ← صعودی یورو.")
     if country in ["EUR", "EMU"]:
-        return "داده اروپا بهتر از انتظار ← یورو قوی ← صعودی." if higher else "داده اروپا ضعیف‌تر ← یورو ضعیف ← نزولی."
-    return "اثر باید با واکنش بازار بررسی شود."
-
+        return diff_text + ("داده اروپا بهتر از انتظار ← یورو قوی ← صعودی." if higher else "داده اروپا ضعیف‌تر ← یورو ضعیف ← نزولی.")
+    return diff_text + "اثر باید با واکنش بازار بررسی شود."
 
 def get_today_events():
     data = fetch_calendar()
@@ -932,12 +922,10 @@ def get_today_events():
             out.append(ev)
     return out
 
-
 def get_week_events():
     data = fetch_calendar()
     return [ev for ev in data if ev.get("country") in ["USD", "EUR", "EMU"]
             and ev.get("impact") == "High"]
-
 
 def check_upcoming_events():
     try:
@@ -966,8 +954,7 @@ def check_upcoming_events():
     except Exception as ex:
         print("خطا در بررسی اخبار پیش‌رو:", ex)
         return []
-
-
+                
 # ==================================================================
 # بخش ۹: دریافت اخبار
 # ==================================================================
@@ -985,7 +972,6 @@ def fetch_rss(url, n=15):
         pass
     return out
 
-
 def fetch_all_news():
     items = []
     items += fetch_rss(SOURCES["fxstreet_rss"], 15)
@@ -1001,7 +987,6 @@ def fetch_all_news():
             seen.add(key)
             uniq.append(x)
     return uniq[:40]
-
 
 def check_live_news():
     hits = []
@@ -1039,7 +1024,6 @@ def check_live_news():
         print("خطا در بررسی اخبار زنده:", ex)
         return []
 
-
 def check_breaking_headlines():
     try:
         urls = [SOURCES["fxstreet_rss"], SOURCES["forexlive"]]
@@ -1071,15 +1055,10 @@ def check_breaking_headlines():
     except Exception:
         return []
 
-
 # ==================================================================
 # بخش ۱۰: هوش مصنوعی (با سیستم Fallback)
 # ==================================================================
 def call_groq(messages, temperature, max_tokens):
-    """
-    فراخوانی Groq با سیستم Fallback.
-    مدل‌ها را به ترتیب امتحان می‌کند تا یکی کار کند.
-    """
     errors = []
     for model in AI_MODELS:
         try:
@@ -1090,7 +1069,6 @@ def call_groq(messages, temperature, max_tokens):
                 max_tokens=max_tokens,
             )
             raw = resp.choices[0].message.content.strip()
-            # حذف افکار پنهان (مدل‌های استدلال‌گر)
             raw = strip_think_tags(raw)
             return raw
         except Exception as ex:
@@ -1101,9 +1079,7 @@ def call_groq(messages, temperature, max_tokens):
     print(f"❌ همه مدل‌ها خطا دادند: {' | '.join(errors)}")
     return None
 
-
 def score_sentiment_ai(news_text):
-    """تحلیل احساسات با هوش مصنوعی"""
     if not HAS_GROQ:
         return 0, 0, "هوش مصنوعی در دسترس نیست"
     try:
@@ -1138,7 +1114,6 @@ def score_sentiment_ai(news_text):
         print("خطا در تحلیل احساسات:", ex)
     return 0, 0, "تحلیل ممکن نشد"
 
-
 def get_direction(bull, bear):
     diff = bull - bear
     if diff >= 4:
@@ -1152,9 +1127,7 @@ def get_direction(bull, bear):
     else:
         return "خنثی", "پایین"
 
-
 def summarize_speech_ai(speech_texts, speaker_name=""):
-    """خلاصه سخنرانی به فارسی"""
     if not HAS_GROQ:
         return None
     try:
@@ -1181,9 +1154,7 @@ def summarize_speech_ai(speech_texts, speaker_name=""):
         print("خطا در خلاصه سخنرانی:", ex)
         return None
 
-
-def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence, performance):
-    """تحلیل جامع فاندامنتال — کاملاً فارسی و عمیق"""
+def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence, performance, market_assets=None):
     if not HAS_GROQ:
         return None
     try:
@@ -1197,6 +1168,10 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
             acc = performance["accuracy"]
             if acc < 50:
                 perf_note = f"\nنکته: دقت اخیر ربات {acc}٪ است. با احتیاط تحلیل کن."
+                
+        market_text = ""
+        if market_assets:
+            market_text = f"شاخص دلار (DXY): {market_assets.get('DXY (شاخص دلار)', 'نامشخص')} | بازده اوراق 10 ساله آمریکا: {market_assets.get('US10Y (اوراق 10 ساله)', 'نامشخص')}% | طلا: {market_assets.get('Gold (طلا)', 'نامشخص')}$"
 
         prompt = f"""تو تحلیل‌گر فاندامنتال حرفه‌ای و باتجربه یورو/دلار هستی.
 فقط بر اساس اخبار و داده‌های اقتصادی تحلیل کن. تکنیکال اصلاً نباید.
@@ -1205,9 +1180,16 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
 
 قواعد:
 - تحلیل جامع و عمیق (۲۰۰ تا ۳۰۰ کلمه)
+- فقط و فقط داده‌های آمریکا (USD) و منطقه یورو (EUR) را لحاظ کن. 
 - فقط فارسی
-- بدون کلمه انگلیسی
+- بدون هیچ کلمه انگلیسی
 - جهت تحلیل باید با امتیاز هم‌خوانی داشته باشد
+
+روایت غالب فعلی بازار (بسیار مهم در تحلیل):
+{CURRENT_NARRATIVE}
+
+وضعیت لحظه‌ای بازارهای موازی (برای تایید سیگنال‌ها استفاده کن):
+{market_text if market_text else "داده در دسترس نیست"}
 
 ساختار تحلیل (مثل یک گزارش حرفه‌ای):
 
@@ -1215,18 +1197,15 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
 - وضعیت فعلی بازار یورو/دلار را توصیف کن
 - مهم‌ترین عامل هدایت‌کننده بازار را مشخص کن
 
-۲) عوامل مؤثر (دو تا سه پاراگراف):
+۲) عوامل مؤثر و بازارهای موازی (دو تا سه پاراگراف):
 - هر عامل اقتصادی را با دلیل و منطق توضیح بده
-- علت و معلول را واضح بگو
-- به داده‌های اقتصادی، اخبار بانک مرکزی، ژئوپلیتیک اشاره کن
+- به داده‌های اقتصادی، اخبار بانک مرکزی و بازده اوراق قرضه اشاره کن
 
 ۳) نبض احساسات بازار (یک خط):
 - آیا بازار ریسک‌پذیر است یا ریسک‌گریز؟
-- دلار تقویت می‌شود یا ضعیف می‌شود؟
 
 ۴) چشم‌انداز کوتاه‌مدت (یک پاراگراف):
 - بازار امروز به چه چیزی چشم دوخته است؟
-- چه رویدادی می‌تواند جهت را تغییر دهد؟
 
 ۵) توصیه نهایی (یک خط):
 - اقدام عملی معامله‌گر
@@ -1247,15 +1226,16 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
             {"role": "system", "content": "تو تحلیل‌گر فاندامنتال حرفه‌ای فارکس هستی. فقط فارسی. تحلیل‌هایت عمیق و دقیق هستند. هیچ کلمه انگلیسی، چینی یا زبان دیگر استفاده نکن."},
             {"role": "user", "content": prompt},
         ]
-        result = call_groq(messages, temperature=0.4, max_tokens=800)
+        result = call_groq(messages, temperature=0.2, max_tokens=800)
         if result:
-            return clean_foreign_chars(result)
+            cleaned = clean_foreign_chars(result)
+            cleaned = re.sub(r'(?i)\bcause\b', 'باعث', cleaned)
+            return cleaned
         return None
     except Exception as ex:
         print("خطا در تحلیل هوش مصنوعی:", ex)
         return None
-
-
+        
 # ==================================================================
 # بخش ۱۱: ساخت پیام
 # ==================================================================
@@ -1289,7 +1269,6 @@ def build_calendar_alert(events):
     lines.append(get_motivation(slot="morning"))
     return "\n".join(lines)
 
-
 def build_prealert(events):
     time_fa = get_time_fa()
     parts = ["⏰ هشدار: خبر مهم در راه است!", "", f"🕒 زمان: {time_fa} تهران", ""]
@@ -1308,12 +1287,12 @@ def build_prealert(events):
     parts.extend([
         "⚠️ توصیه‌ها:",
         "• حجم معامله را کاهش دهید",
+        "• ⚠️ هشدار نقدینگی: اسپردها در لحظه خبر شدیداً واید می‌شوند.",
         "• حد ضرر تنظیم کنید",
         "",
         get_motivation(direction="خنثی"),
     ])
     return "\n".join(parts)
-
 
 def build_data_release_msg(hits):
     date_fa, _ = get_date_fa()
@@ -1328,12 +1307,13 @@ def build_data_release_msg(hits):
             f"📊 پیش‌بینی: {to_fa_digits(str(h.get('forecast', '')))}",
             f"📉 قبلی: {to_fa_digits(str(h.get('previous', '')))}",
             "",
-            f"💡 اثر: {h.get('impact_text', '')}",
+            f"💡 اثر: {to_fa_digits(h.get('impact_text', ''))}",
             "",
         ])
+    parts.append("⚠️ **هشدار نقدینگی:** در ثانیه‌های اول انتشار خبر، اسپردها به شدت واید می‌شوند. برای ورود به معامله حداقل ۳ تا ۵ دقیقه صبر کنید تا بازار تثبیت شود.")
+    parts.append("")
     parts.append(get_motivation())
     return "\n".join(parts)
-
 
 def build_speech_summary(speech_texts, speaker=""):
     date_fa, _ = get_date_fa()
@@ -1355,11 +1335,10 @@ def build_speech_summary(speech_texts, speaker=""):
     parts.extend(["", get_motivation()])
     return "\n".join(parts)
 
-
 def build_fundamental_brief(news_text, bull, bear, direction, confidence, reason,
                             calendar_events=None, performance=None,
                             view_changed=False, prev_dir=None, prev_reason="",
-                            slot_label="تحلیل فاندامنتال", slot=None):
+                            slot_label="تحلیل فاندامنتال", slot=None, market_assets=None):
     date_fa, date_short = get_date_fa()
     time_fa = get_time_fa()
 
@@ -1376,6 +1355,11 @@ def build_fundamental_brief(news_text, bull, bear, direction, confidence, reason
         f"💡 دلیل: {reason}",
         "",
     ]
+    
+    if market_assets:
+        market_str = " | ".join([f"{k}: {v}" for k, v in market_assets.items()])
+        parts.append(f"🌐 بازارهای موازی: {to_fa_digits(market_str)}")
+        parts.append("")
 
     if view_changed and prev_dir:
         parts.extend([
@@ -1391,9 +1375,9 @@ def build_fundamental_brief(news_text, bull, bear, direction, confidence, reason
         parts.append("⚠️ جهت بازار عوض شده. با احتیاط!")
         parts.append("")
 
-    ai = ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence, performance)
+    ai = ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence, performance, market_assets)
     if ai:
-        parts.extend(["━━━━━━━━━━━━━━", "🤖 تحلیل:", "", ai, ""])
+        parts.extend(["━━━━━━━━━━━━━━", "🤖 تحلیل (مبتنی بر روایت فعلی بازار):", "", ai, ""])
 
     if calendar_events:
         now_te = datetime.now(TEHRAN_TZ)
@@ -1441,8 +1425,7 @@ def build_fundamental_brief(news_text, bull, bear, direction, confidence, reason
     voice = "\n".join(voice_parts)
 
     return msg, voice
-
-
+                                
 # ==================================================================
 # بخش ۱۲: تلگرام
 # ==================================================================
@@ -1473,7 +1456,6 @@ def send_text(text):
         except Exception as ex:
             print("خطا در ارسال:", ex)
     return True
-
 
 def send_voice(text_fa):
     if not SEND_VOICE:
@@ -1510,8 +1492,7 @@ def send_voice(text_fa):
                 os.unlink(audio)
         except Exception:
             pass
-
-
+            
 # ==================================================================
 # بخش ۱۳: اجرا
 # ==================================================================
@@ -1519,6 +1500,7 @@ def build_weekly_report():
     date_fa, _ = get_date_fa()
     news = fetch_all_news()
     week_events = get_week_events()
+    market_assets = get_market_assets()
     bull, bear, reason = score_sentiment_ai("\n".join(news))
     direction, confidence = get_direction(bull, bear)
     performance = verify_predictions()
@@ -1526,6 +1508,11 @@ def build_weekly_report():
     parts = ["📊 گزارش هفتگی یورو/دلار", "", date_fa, "", "━━━━━━━━━━━━━━"]
     if performance and performance.get("total", 0) > 0:
         parts.extend([build_performance_view(performance), ""])
+        
+    if market_assets:
+        market_str = " | ".join([f"{k}: {v}" for k, v in market_assets.items()])
+        parts.extend([f"🌐 وضعیت پایانی بازارها:", to_fa_digits(market_str), ""])
+        
     parts.extend([
         f"📐 جهت هفته: {direction}",
         f"🔒 اطمینان: {confidence}",
@@ -1533,7 +1520,7 @@ def build_weekly_report():
         f"💡 دلیل: {reason}",
         "",
     ])
-    ai = ai_analyze_fa(news, week_events, bull, bear, direction, confidence, performance)
+    ai = ai_analyze_fa(news, week_events, bull, bear, direction, confidence, performance, market_assets)
     if ai:
         parts.extend(["━━━━━━━━━━━━━━", "🤖 تحلیل:", "", ai, ""])
     parts.extend(["━━━━━━━━━━━━━━", "📅 خبرهای مهم هفته آینده:"])
@@ -1544,7 +1531,6 @@ def build_weekly_report():
         parts.append("خبر مهمی ثبت نشده.")
     parts.extend(["", get_motivation(), "", f"@EURUSDFaBot | {date_fa}"])
     return "\n".join(parts)
-
 
 def run_once(slot="manual"):
     now = datetime.now(TEHRAN_TZ)
@@ -1623,12 +1609,13 @@ def run_once(slot="manual"):
 
             cal = get_today_events()
             perf_summary = verify_predictions()
+            market_assets = get_market_assets()
 
             msg, voice = build_fundamental_brief(
                 full_news, bull, bear, direction, confidence, reason,
                 calendar_events=cal, performance=perf_summary,
                 view_changed=view_changed, prev_dir=prev_dir, prev_reason=prev_reason,
-                slot_label="🔔 تحلیل خبر فوری", slot="watch",
+                slot_label="🔔 تحلیل خبر فوری", slot="watch", market_assets=market_assets
             )
             send_text(msg)
 
@@ -1658,6 +1645,7 @@ def run_once(slot="manual"):
     cal = get_today_events()
     bull, bear, reason = score_sentiment_ai("\n".join(news))
     direction, confidence = get_direction(bull, bear)
+    market_assets = get_market_assets()
 
     view_changed, prev_dir, prev_reason = check_view_change(direction, reason)
     perf_summary = verify_predictions()
@@ -1674,7 +1662,7 @@ def run_once(slot="manual"):
         "\n".join(news), bull, bear, direction, confidence, reason,
         calendar_events=cal, performance=perf_summary,
         view_changed=view_changed, prev_dir=prev_dir, prev_reason=prev_reason,
-        slot_label=slot_label, slot=slot,
+        slot_label=slot_label, slot=slot, market_assets=market_assets
     )
     send_text(msg)
 
@@ -1685,7 +1673,6 @@ def run_once(slot="manual"):
 
     if SEND_VOICE:
         send_voice(voice)
-
 
 # ==================================================================
 # بخش ۱۴: اصلی
