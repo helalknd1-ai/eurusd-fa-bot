@@ -10,5 +10,9 @@
   "pre_FOMC Statement_2026-07-29T14:00:00-04:00": {
     "date": "2026-07-29",
     "sent_at": "21:00"
+  },
+  "pre_FOMC Press Conference_2026-07-29T14:30:00-04:00": {
+    "date": "2026-07-29",
+    "sent_at": "21:30"
   }
 }
