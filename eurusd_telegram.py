@@ -70,9 +70,9 @@ AI_MODELS = [
 ]
 
 SCHEDULES = {
-    "morning": {"hour": 7, "minute": 30, "label": "🌅 تحلیل صبحگاهی"},
+    "morning": {"hour": 10, "minute": 10, "label": "🌅 پیش‌گشایش لندن (ثبت جهت)"},
     "us_preopen": {"hour": 16, "minute": 0, "label": "🌆 قبل بازار آمریکا"},
-    "evening": {"hour": 18, "minute": 0, "label": "🌙 جمع‌بندی روز"},
+    "evening": {"hour": 21, "minute": 30, "label": "🌙 ارزیابی و جمع‌بندی روزانه"},
     "watch": {"hour": 0, "minute": 0, "label": "🔔 رصد اخبار فوری"},
     "manual": {"hour": 0, "minute": 0, "label": "🔧 اجرای دستی"},
     "weekly": {"hour": 20, "minute": 0, "label": "📊 گزارش هفتگی"},
@@ -700,9 +700,20 @@ def verify_predictions():
             continue
         try:
             ptime = datetime.fromisoformat(pred["timestamp"])
-            hours = (now - ptime).total_seconds() / 3600
-            if hours < 24:
+            
+            # --- منطق جدید ارزیابی درون‌روزی (Intraday) ---
+            # تنظیم زمان هدف برای بررسی (ساعت ۲۱:۳۰ همان روز به وقت تهران)
+            target_time = ptime.replace(hour=21, minute=30, second=0, microsecond=0)
+            
+            # اگر پیش‌بینی خودش بعد از ساعت ۲۱:۳۰ شب صادر شده باشد، بررسی آن می‌افتد برای ۲۱:۳۰ فردا
+            if ptime >= target_time:
+                target_time += timedelta(days=1)
+            
+            # اگر هنوز به ساعت ۲۱:۳۰ نرسیده‌ایم، از این پیش‌بینی رد شو و بعدا بررسی کن
+            if now < target_time:
                 continue
+            # ----------------------------------------------
+            
             old = pred.get("price_at_prediction", 0)
             if not old:
                 continue
