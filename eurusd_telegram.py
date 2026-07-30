@@ -1199,7 +1199,7 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
         if market_assets:
             market_text = f"شاخص دلار (DXY): {market_assets.get('DXY (شاخص دلار)', 'نامشخص')} | بازده اوراق 10 ساله آمریکا: {market_assets.get('US10Y (اوراق 10 ساله)', 'نامشخص')}% | طلا: {market_assets.get('Gold (طلا)', 'نامشخص')}$"
 
-                prompt = f"""تو تحلیل‌گر فاندامنتال حرفه‌ای و باتجربه یورو/دلار هستی.
+        prompt = f"""تو تحلیل‌گر فاندامنتال حرفه‌ای و باتجربه یورو/دلار هستی.
 فقط بر اساس اخبار و داده‌های اقتصادی تحلیل کن. تکنیکال اصلاً نباید.
 
 {ECON_RULES}
@@ -1261,6 +1261,7 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
     except Exception as ex:
         print("خطا در تحلیل هوش مصنوعی:", ex)
         return None
+
         
 # ==================================================================
 # بخش ۱۱: ساخت پیام
