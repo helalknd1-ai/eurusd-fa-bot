@@ -1,1 +1,14 @@
-
+{
+  "20260730_1442_morning": {
+    "timestamp": "2026-07-30T14:42:06.413270+03:30",
+    "date": "2026-07-30",
+    "slot": "morning",
+    "direction": "صعودی",
+    "confidence": "بالا",
+    "price_at_prediction": 1.1478,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
+  }
+}
