@@ -44,6 +44,29 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Set Slot Name Based on Execution Time
+        id: select_slot
+        run: |
+          # استخراج ساعت فعلی به وقت تهران
+          HOUR=$(TZ="Asia/Tehran" date +%H)
+          
+          # بررسی اینکه آیا اجرا دستی بوده یا از طریق سایت cron-job (بدون پارامتر) است
+          if [ "${{ github.event.inputs.slot }}" != "watch" ]; then
+            # اگر شما به صورت دستی از داخل سایت گیت‌هاب گزینه‌ای انتخاب کردید، همان را اجرا کن
+            echo "SLOT=${{ github.event.inputs.slot }}" >> $GITHUB_ENV
+          else
+            # اگر از cron-job در ساعت 10 صبح اجرا شد -> ثبت پیش‌بینی لندن
+            if [ "$HOUR" -ge 9 ] && [ "$HOUR" -lt 12 ]; then
+              echo "SLOT=morning" >> $GITHUB_ENV
+            # اگر از cron-job در ساعت 21:30 شب اجرا شد -> ارزیابی و ثبت عملکرد
+            elif [ "$HOUR" -ge 20 ] && [ "$HOUR" -lt 23 ]; then
+              echo "SLOT=evening" >> $GITHUB_ENV
+            # در غیر این صورت -> رصد اخبار فوری
+            else
+              echo "SLOT=watch" >> $GITHUB_ENV
+            fi
+          fi
+
       - name: Run EURUSD Bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -56,7 +79,8 @@ jobs:
           NEWS_IMPACT: "High,Medium"
           TZ: "Asia/Tehran"
         run: |
-          python -u eurusd_telegram.py --slot ${{ github.event.inputs.slot }}
+          # اجرای پایتون با متغیر هوشمندی که در مرحله قبل ساخته شد
+          python -u eurusd_telegram.py --slot ${{ env.SLOT }}
 
       - name: Commit data files
         if: always()
@@ -66,7 +90,8 @@ jobs:
           
           FILES_CHANGED=false
           
-          for file in seen_events.json predictions.json performance.json; do
+          # اضافه شدن last_view.json به سیستم ذخیره‌سازی
+          for file in seen_events.json predictions.json performance.json last_view.json; do
             if [ -f "$file" ]; then
               git add "$file"
               FILES_CHANGED=true
