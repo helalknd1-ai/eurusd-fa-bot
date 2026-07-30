@@ -10,5 +10,13 @@
   "hl_c084d0c62b4e4400a45f52ca26011575": {
     "date": "2026-07-30",
     "title": "USD/JPY stumbles lower in quick drop before slight bounce back"
+  },
+  "pre_Advance GDP q/q_2026-07-30T08:30:00-04:00": {
+    "date": "2026-07-30",
+    "sent_at": "15:30"
+  },
+  "pre_Core PCE Price Index m/m_2026-07-30T08:30:00-04:00": {
+    "date": "2026-07-30",
+    "sent_at": "15:30"
   }
 }
