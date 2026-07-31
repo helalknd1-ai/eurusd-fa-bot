@@ -21,9 +21,11 @@
     "confidence": "بالا",
     "price_at_prediction": 1.1509,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "correct",
+    "price_change_pips": 28.0,
+    "price_at_check": 1.1537,
+    "threshold_used": 20.0
   },
   "20260731_0930_morning": {
     "timestamp": "2026-07-31T09:30:59.677632+03:30",
@@ -33,9 +35,11 @@
     "confidence": "بالا",
     "price_at_prediction": 1.1509,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "correct",
+    "price_change_pips": 28.0,
+    "price_at_check": 1.1537,
+    "threshold_used": 20.0
   },
   "20260731_1001_morning": {
     "timestamp": "2026-07-31T10:01:02.496200+03:30",
@@ -45,9 +49,11 @@
     "confidence": "بالا",
     "price_at_prediction": 1.1521,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "neutral",
+    "price_change_pips": 16.0,
+    "price_at_check": 1.1537,
+    "threshold_used": 20.0
   },
   "20260731_1010_morning": {
     "timestamp": "2026-07-31T10:10:52.218360+03:30",
@@ -57,8 +63,10 @@
     "confidence": "پایین",
     "price_at_prediction": 1.1517,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "wrong",
+    "price_change_pips": 20.0,
+    "price_at_check": 1.1537,
+    "threshold_used": 20.0
   }
 }
