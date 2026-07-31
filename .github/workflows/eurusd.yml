@@ -44,28 +44,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Set Slot Name Based on Execution Time
+      - name: Set Slot Name
         id: select_slot
         run: |
-          # استخراج ساعت فعلی به وقت تهران
-          HOUR=$(TZ="Asia/Tehran" date +%H)
-          
-          # بررسی اینکه آیا اجرا دستی بوده یا از طریق سایت cron-job (بدون پارامتر) است
-          if [ "${{ github.event.inputs.slot }}" != "watch" ]; then
-            # اگر شما به صورت دستی از داخل سایت گیت‌هاب گزینه‌ای انتخاب کردید، همان را اجرا کن
-            echo "SLOT=${{ github.event.inputs.slot }}" >> $GITHUB_ENV
-          else
-            # اگر از cron-job در ساعت 10 صبح اجرا شد -> ثبت پیش‌بینی لندن
-            if [ "$HOUR" -ge 9 ] && [ "$HOUR" -lt 12 ]; then
-              echo "SLOT=morning" >> $GITHUB_ENV
-            # اگر از cron-job در ساعت 21:30 شب اجرا شد -> ارزیابی و ثبت عملکرد
-            elif [ "$HOUR" -ge 20 ] && [ "$HOUR" -lt 23 ]; then
-              echo "SLOT=evening" >> $GITHUB_ENV
-            # در غیر این صورت -> رصد اخبار فوری
-            else
-              echo "SLOT=watch" >> $GITHUB_ENV
-            fi
+          # بدون هیچ دخالت زمانی! فقط به دستور ورودی گوش می‌دهد.
+          # اگر دستوری نیامد (مثل اجرای کرون‌جاب هر نیم ساعته)، پیش‌فرض watch را اجرا می‌کند.
+          SLOT_VAL="${{ github.event.inputs.slot }}"
+          if [ -z "$SLOT_VAL" ]; then
+            SLOT_VAL="watch"
           fi
+          echo "SLOT=$SLOT_VAL" >> $GITHUB_ENV
 
       - name: Run EURUSD Bot
         env:
@@ -79,7 +67,6 @@ jobs:
           NEWS_IMPACT: "High,Medium"
           TZ: "Asia/Tehran"
         run: |
-          # اجرای پایتون با متغیر هوشمندی که در مرحله قبل ساخته شد
           python -u eurusd_telegram.py --slot ${{ env.SLOT }}
 
       - name: Commit data files
@@ -90,7 +77,6 @@ jobs:
           
           FILES_CHANGED=false
           
-          # اضافه شدن last_view.json به سیستم ذخیره‌سازی
           for file in seen_events.json predictions.json performance.json last_view.json; do
             if [ -f "$file" ]; then
               git add "$file"
@@ -104,14 +90,4 @@ jobs:
               git push
             fi
           fi
-
-      - name: Notify on failure
-        if: failure()
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
-            -d chat_id="${TELEGRAM_CHAT_ID}" \
-            -d text="⚠️ خطا در ربات EURUSD - $(TZ='Asia/Tehran' date '+%Y-%m-%d %H:%M')" \
-            || true
+          
