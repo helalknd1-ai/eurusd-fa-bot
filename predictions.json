@@ -152,5 +152,17 @@
     "price_change_pips": -13.0,
     "price_at_check": 1.1546,
     "threshold_used": 20.0
+  },
+  "20260811_1010_morning": {
+    "timestamp": "2026-08-11T10:10:53.549225+03:30",
+    "date": "2026-08-11",
+    "slot": "morning",
+    "direction": "نزولی",
+    "confidence": "بالا",
+    "price_at_prediction": 1.1541,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
   }
 }
