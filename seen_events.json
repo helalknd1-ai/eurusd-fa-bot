@@ -10,5 +10,21 @@
   "hl_f39e51094a8cc727700f792cbef7faf8": {
     "date": "2026-08-12",
     "title": "Silver's rally will face a key test today with the US CPI expected to influence Fed rate hike bets"
+  },
+  "pre_Core CPI m/m_2026-08-12T08:30:00-04:00": {
+    "date": "2026-08-12",
+    "sent_at": "15:30"
+  },
+  "pre_Core CPI y/y_2026-08-12T08:30:00-04:00": {
+    "date": "2026-08-12",
+    "sent_at": "15:30"
+  },
+  "pre_CPI m/m_2026-08-12T08:30:00-04:00": {
+    "date": "2026-08-12",
+    "sent_at": "15:30"
+  },
+  "pre_CPI y/y_2026-08-12T08:30:00-04:00": {
+    "date": "2026-08-12",
+    "sent_at": "15:30"
   }
 }
