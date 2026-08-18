@@ -222,5 +222,17 @@
     "price_change_pips": -13.0,
     "price_at_check": 1.1581,
     "threshold_used": 20.0
+  },
+  "20260818_1010_morning": {
+    "timestamp": "2026-08-18T10:10:35.434849+03:30",
+    "date": "2026-08-18",
+    "slot": "morning",
+    "direction": "خنثی",
+    "confidence": "پایین",
+    "price_at_prediction": 1.1573,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
   }
 }
