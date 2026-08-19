@@ -86,10 +86,13 @@ TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
 # ⭐ مدل‌های هوش مصنوعی (به ترتیب اولویت - همه رایگان)
 AI_MODELS = [
-    "openai/gpt-oss-120b",       # بهترین کیفیت رایگان - 120B پارامتر
-    "moonshotai/kimi-k2-instruct", # Fallback اول - context بزرگ 262K
-    "qwen/qwen3.6-27b",           # Fallback دوم - سریع و رایگان
+    "openai/gpt-oss-120b",       # بهترین کیفیت رایگان - 120B - reasoning model
+    "qwen/qwen3.6-27b",           # Fallback اول - سریع و رایگان
+    "openai/gpt-oss-20b",         # Fallback دوم - سبک و رایگان
 ]
+
+# مدل‌هایی که reasoning هستند و پارامترهای خاص می‌خواهند
+REASONING_MODELS = {"openai/gpt-oss-120b", "openai/gpt-oss-20b"}
 
 SCHEDULES = {
     "morning": {"hour": 10, "minute": 10, "label": "🌅 پیش‌گشایش لندن (ثبت جهت)"},
@@ -1142,22 +1145,58 @@ def call_groq(messages, temperature, max_tokens):
     for model in AI_MODELS:
         try:
             print(f"🤖 تلاش با مدل: {model}")
-            resp = groq_client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            raw = resp.choices[0].message.content.strip()
-            raw = strip_think_tags(raw)
+            
+            is_reasoning = model in REASONING_MODELS
+            
+            if is_reasoning:
+                # Reasoning models: system prompt را ادغام کن در user message
+                # و از max_completion_tokens و reasoning_effort استفاده کن
+                merged_messages = []
+                system_text = ""
+                for msg in messages:
+                    if msg["role"] == "system":
+                        system_text = msg["content"]
+                    else:
+                        if system_text and msg["role"] == "user":
+                            merged_messages.append({
+                                "role": "user",
+                                "content": f"دستورات:\n{system_text}\n\n{msg['content']}"
+                            })
+                            system_text = ""
+                        else:
+                            merged_messages.append(msg)
+                if not merged_messages:
+                    merged_messages = messages
+                    
+                resp = groq_client.chat.completions.create(
+                    model=model,
+                    messages=merged_messages,
+                    temperature=max(0.5, temperature),  # reasoning مدل‌ها حداقل 0.5 می‌خواهند
+                    max_completion_tokens=max_tokens,
+                    reasoning_effort="low",  # low برای سرعت بیشتر و هزینه کمتر
+                    reasoning_format="hidden",  # reasoning خام را مخفی کن
+                )
+            else:
+                # مدل‌های معمولی
+                resp = groq_client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
+            
+            raw = resp.choices[0].message.content
             if raw:
-                print(f"✅ مدل {model} موفق بود")
+                raw = raw.strip()
+                raw = strip_think_tags(raw)
+            if raw:
+                print(f"✅ مدل {model} موفق بود (طول: {len(raw)})")
                 return raw
             else:
                 print(f"⚠️ مدل {model} خروجی خالی داد")
                 continue
         except Exception as ex:
-            err_msg = str(ex)[:200]
+            err_msg = str(ex)[:300]
             errors.append(f"{model}: {err_msg}")
             print(f"⚠️ مدل {model} خطا داد: {err_msg}")
             # اگر rate limit خورد، کمی صبر کن
