@@ -51,11 +51,31 @@ VOICE_PITCH = os.getenv("VOICE_PITCH", "+0Hz")
 
 NEWS_IMPACT_LEVELS = os.getenv("NEWS_IMPACT", "High,Medium").split(",")
 
-# 💡 روایت غالب بازار (تغییر بر اساس شرایط فعلی جهان)
-CURRENT_NARRATIVE = os.getenv(
-    "MARKET_NARRATIVE", 
-    "تمرکز اصلی بازار روی تورم آمریکا و مسیر کاهش نرخ بهره فدرال رزرو است. همچنین ریسک‌های ژئوپلیتیک می‌تواند باعث تقاضای پناهگاه امن برای دلار شود."
-)
+# 💡 روایت غالب بازار (خودکار ساخته می‌شود، یا اگر دستی تنظیم شد استفاده می‌شود)
+CURRENT_NARRATIVE_OVERRIDE = os.getenv("MARKET_NARRATIVE", "")
+
+def build_market_narrative(news_text):
+    """ساخت خودکار روایت بازار با AI بر اساس اخبار روز"""
+    if CURRENT_NARRATIVE_OVERRIDE:
+        return CURRENT_NARRATIVE_OVERRIDE
+    if not HAS_GROQ:
+        return "روایت بازار در دسترس نیست."
+    try:
+        messages = [
+            {"role": "system", "content": (
+                "تو تحلیل‌گر ارشد فارکس هستی. بر اساس اخبار، روایت غالب فعلی بازار یورو/دلار را "
+                "در ۲ تا ۳ جمله کوتاه فارسی خلاصه کن. "
+                "فقط بگو الان بازار روی چه موضوعی تمرکز دارد و چه عاملی حرکت‌دهنده اصلی است. "
+                "بدون کلمه انگلیسی."
+            )},
+            {"role": "user", "content": f"اخبار امروز:\n{news_text[:2000]}"},
+        ]
+        result = call_groq(messages, temperature=0.1, max_tokens=200)
+        if result:
+            return clean_foreign_chars(result)
+    except Exception as ex:
+        print("خطا در ساخت روایت بازار:", ex)
+    return "روایت بازار در دسترس نیست."
 
 SEEN_FILE = "seen_events.json"
 PREDICTIONS_FILE = "predictions.json"
@@ -64,9 +84,11 @@ BATCH_FILE = "news_batch.json"
 
 TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
 
-# ⭐ مدل‌های هوش مصنوعی
+# ⭐ مدل‌های هوش مصنوعی (به ترتیب اولویت - همه رایگان)
 AI_MODELS = [
-    "llama-3.3-70b-versatile",
+    "openai/gpt-oss-120b",       # بهترین کیفیت رایگان - 120B پارامتر
+    "moonshotai/kimi-k2-instruct", # Fallback اول - context بزرگ 262K
+    "qwen/qwen3.6-27b",           # Fallback دوم - سریع و رایگان
 ]
 
 SCHEDULES = {
@@ -292,7 +314,7 @@ MOTIVATIONAL_GENERAL = [
 MOTIVATIONAL_BULLISH = [
     "🟢 روند صعودی به‌کنار، فرصت خوبی در راه است!",
     "📈 بازار با توست — با اطمینان گام بردار.",
-    "✨ باد مال сторону — بادبان را تنظیم کن!",
+    "✨ باد موافق است — بادبان را تنظیم کن!",
     "🚀 صبر در صعود، کلید سود بزرگ است.",
 ]
 
@@ -664,6 +686,14 @@ def save_prediction(direction, confidence, slot, has_news=False):
         return
     predictions = load_json(PREDICTIONS_FILE, {})
     now = datetime.now(TEHRAN_TZ)
+    today = now.strftime("%Y%m%d")
+    
+    # جلوگیری از ثبت پیش‌بینی تکراری در یک روز برای یک slot
+    existing_today = [k for k in predictions.keys() if k.startswith(today) and k.endswith(f"_{slot}")]
+    if existing_today:
+        print(f"⚠️ پیش‌بینی امروز برای {slot} قبلاً ثبت شده ({existing_today[0]}) — رد شد")
+        return
+    
     pid = f"{now.strftime('%Y%m%d_%H%M')}_{slot}"
     predictions[pid] = {
         "timestamp": now.isoformat(),
@@ -692,7 +722,18 @@ def verify_predictions():
     if not current:
         return None
     now = datetime.now(TEHRAN_TZ)
-    threshold = 20.0
+    
+    # آستانه پویا بر اساس ATR واقعی
+    atr = get_eurusd_atr(14)
+    if atr and atr > 0:
+        # آستانه = 30% از ATR روزانه (پویا)
+        threshold = round(atr * 0.3, 1)
+        threshold = max(10.0, min(threshold, 35.0))  # حداقل 10، حداکثر 35
+        print(f"📏 آستانه پویا: {threshold} پیپ (ATR14={atr})")
+    else:
+        threshold = 20.0
+        print(f"📏 آستانه ثابت: {threshold} پیپ (ATR دریافت نشد)")
+    
     changed = False
 
     for pid, pred in predictions.items():
@@ -1096,9 +1137,11 @@ def check_breaking_headlines():
 # بخش ۱۰: هوش مصنوعی (با سیستم Fallback)
 # ==================================================================
 def call_groq(messages, temperature, max_tokens):
+    import time
     errors = []
     for model in AI_MODELS:
         try:
+            print(f"🤖 تلاش با مدل: {model}")
             resp = groq_client.chat.completions.create(
                 model=model,
                 messages=messages,
@@ -1107,16 +1150,48 @@ def call_groq(messages, temperature, max_tokens):
             )
             raw = resp.choices[0].message.content.strip()
             raw = strip_think_tags(raw)
-            return raw
+            if raw:
+                print(f"✅ مدل {model} موفق بود")
+                return raw
+            else:
+                print(f"⚠️ مدل {model} خروجی خالی داد")
+                continue
         except Exception as ex:
-            err_msg = str(ex)[:150]
+            err_msg = str(ex)[:200]
             errors.append(f"{model}: {err_msg}")
             print(f"⚠️ مدل {model} خطا داد: {err_msg}")
+            # اگر rate limit خورد، کمی صبر کن
+            if "rate_limit" in err_msg.lower() or "429" in err_msg:
+                print("⏳ صبر ۵ ثانیه برای rate limit...")
+                time.sleep(5)
             continue
     print(f"❌ همه مدل‌ها خطا دادند: {' | '.join(errors)}")
     return None
 
-def score_sentiment_ai(news_text):
+def calculate_news_weight(calendar_events=None):
+    """محاسبه وزن اخبار بر اساس تقویم اقتصادی"""
+    if not calendar_events:
+        return 1.0, "بدون خبر مهم"
+    
+    high_count = sum(1 for ev in calendar_events 
+                     if ev.get("impact") == "High" and ev.get("_today"))
+    medium_count = sum(1 for ev in calendar_events 
+                       if ev.get("impact") == "Medium" and ev.get("_today"))
+    
+    # اخبار با داده واقعی (منتشر شده) وزن بیشتری دارند
+    released_count = sum(1 for ev in calendar_events 
+                        if ev.get("actual") and ev.get("_today"))
+    
+    if high_count >= 2 or released_count >= 1:
+        return 1.5, "چند خبر خیلی مهم"
+    elif high_count == 1:
+        return 1.3, "یک خبر مهم"
+    elif medium_count >= 2:
+        return 1.1, "اخبار متوسط"
+    else:
+        return 0.7, "بدون خبر مهم — سیگنال ضعیف‌تر"
+
+def score_sentiment_ai(news_text, calendar_events=None):
     if not HAS_GROQ:
         return 0, 0, "هوش مصنوعی در دسترس نیست"
     try:
@@ -1130,12 +1205,15 @@ def score_sentiment_ai(news_text):
                 "- خبر نزولی یورو (دلار قوی، افزایش نرخ، تورم بالا آمریکا) = bear\n"
                 "- کلمات نفی (not, unlikely) معنی را برعکس کن\n"
                 "- خبر خنثی = 0/0\n"
-                "- bull و bear بین 0 تا 15\n\n"
+                "- bull و bear بین 0 تا 15\n"
+                "- اگر اخبار مختلط هستند، هم bull و هم bear عدد بده (مثلاً bull=6 bear=5)\n"
+                "- وقتی خبر خاصی نیست، امتیازها را نزدیک هم بده (مثلاً bull=3 bear=3) نه اینکه یکی را خیلی بالا ببری\n"
+                "- دلیل را کوتاه، دقیق و بدون تکرار بنویس (حداکثر ۲ جمله)\n\n"
                 'خروجی فقط JSON: {"bull": عدد, "bear": عدد, "reason": "دلیل به فارسی"}'
             )},
             {"role": "user", "content": f"این اخبار را تحلیل کن:\n{news_text[:3000]}"},
         ]
-        raw = call_groq(messages, temperature=0.2, max_tokens=250)
+        raw = call_groq(messages, temperature=0.15, max_tokens=250)
         if not raw:
             return 0, 0, "تحلیل ممکن نشد"
         s = raw.find("{")
@@ -1145,6 +1223,14 @@ def score_sentiment_ai(news_text):
             bull = max(0, min(15, int(data.get("bull", 0))))
             bear = max(0, min(15, int(data.get("bear", 0))))
             reason = clean_foreign_chars(data.get("reason", ""))
+            
+            # اعمال وزن اخبار
+            weight, weight_reason = calculate_news_weight(calendar_events)
+            if weight != 1.0:
+                bull = min(15, round(bull * weight))
+                bear = min(15, round(bear * weight))
+                print(f"[وزن‌دهی] ضریب={weight} ({weight_reason})")
+            
             print(f"[احساسات] صعودی={bull} نزولی={bear} | {reason}")
             return bull, bear, reason
     except Exception as ex:
@@ -1153,13 +1239,43 @@ def score_sentiment_ai(news_text):
 
 def get_direction(bull, bear):
     diff = bull - bear
-    if diff >= 4:
+    total = bull + bear
+    
+    # بررسی دقت اخیر ربات برای تنظیم حساسیت
+    perf = calculate_perf_from_json()
+    accuracy = perf.get("accuracy", 100)
+    decisive = perf.get("decisive", 0)
+    
+    # سیستم خنثی هوشمند: اگر دقت افت کرده، آستانه سخت‌تر شود
+    if decisive >= 5 and accuracy < 40:
+        # دقت خیلی پایین → خیلی محتاط
+        min_diff_high = 7
+        min_diff_medium = 5
+        min_total = 6
+        print(f"🛡️ حالت محتاط فعال (دقت={accuracy}٪) — آستانه‌های بالاتر")
+    elif decisive >= 5 and accuracy < 55:
+        # دقت متوسط → کمی محتاط‌تر
+        min_diff_high = 6
+        min_diff_medium = 4
+        min_total = 5
+        print(f"⚠️ حالت نیمه‌محتاط (دقت={accuracy}٪)")
+    else:
+        # دقت خوب یا داده کم → حالت عادی
+        min_diff_high = 5
+        min_diff_medium = 3
+        min_total = 4
+    
+    # اگر مجموع امتیازها خیلی کم باشد → خنثی
+    if total <= min_total:
+        return "خنثی", "پایین"
+    
+    if diff >= min_diff_high:
         return "صعودی", "بالا"
-    elif diff >= 2:
+    elif diff >= min_diff_medium:
         return "صعودی", "متوسط"
-    elif diff <= -4:
+    elif diff <= -min_diff_high:
         return "نزولی", "بالا"
-    elif diff <= -2:
+    elif diff <= -min_diff_medium:
         return "نزولی", "متوسط"
     else:
         return "خنثی", "پایین"
@@ -1210,42 +1326,51 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
         if market_assets:
             market_text = f"شاخص دلار (DXY): {market_assets.get('DXY (شاخص دلار)', 'نامشخص')} | بازده اوراق 10 ساله آمریکا: {market_assets.get('US10Y (اوراق 10 ساله)', 'نامشخص')}% | طلا: {market_assets.get('Gold (طلا)', 'نامشخص')}$"
 
+        # ساخت خودکار روایت بازار
+        narrative = build_market_narrative(news_text[:1500] if isinstance(news_text, str) else "\n".join(news_text)[:1500])
+
         prompt = f"""تو تحلیل‌گر فاندامنتال حرفه‌ای و باتجربه یورو/دلار هستی.
 فقط بر اساس اخبار و داده‌های اقتصادی تحلیل کن. تکنیکال اصلاً نباید.
 
 {ECON_RULES}
 
-قواعد:
+قواعد سختگیرانه نگارش (حتماً رعایت کن):
 - تحلیل جامع و عمیق (۲۰۰ تا ۳۰۰ کلمه)
-- فقط و فقط داده‌های آمریکا (USD) و منطقه یورو (EUR) را لحاظ کن. 
-- فقط فارسی. جملات را کامل بنویس و از نظر گرامری (داشتن فعل و فاعل در انتهای جمله) ساختار زبان فارسی را دقیقاً رعایت کن.
+- فقط و فقط داده‌های آمریکا (USD) و منطقه یورو (EUR) را لحاظ کن
+- فقط فارسی. جملات را کامل بنویس و از نظر گرامری (داشتن فعل و فاعل در انتهای جمله) ساختار زبان فارسی را دقیقاً رعایت کن
 - بدون هیچ کلمه انگلیسی
 - جهت تحلیل باید با امتیاز هم‌خوانی داشته باشد
+- هر نکته را فقط یک بار بگو. اگر یک مطلب را در بخش ۱ گفتی، در بخش‌های بعدی تکرار نکن
+- اگر اطمینان "بالا" است، در متن ننویس "با احتیاط" یا "ممکن است". قاطع باش
+- اگر اطمینان "پایین" است، قاطعانه ننویس. احتمالی بنویس
+- هر بخش باید اطلاعات متفاوت و جدیدی ارائه دهد. تکرار = شکست
+- در بخش ۲ فقط اعداد واقعی بازارهای موازی را تحلیل کن، حدس نزن
 
-روایت غالب فعلی بازار (بسیار مهم در تحلیل):
-{CURRENT_NARRATIVE}
+روایت غالب فعلی بازار (خودکار تولید شده):
+{narrative}
 
 وضعیت لحظه‌ای بازارهای موازی و چارت (برای تشخیص فیک‌اوت و پیش‌خور شدن استفاده کن):
 {market_text if market_text else "داده در دسترس نیست"}
 
-ساختار تحلیل (مثل یک گزارش حرفه‌ای):
+ساختار تحلیل (هر بخش باید محتوای منحصربه‌فرد داشته باشد):
 
-۱) چشم‌انداز کلی (یک پاراگراف):
-- وضعیت فعلی بازار یورو/دلار را توصیف کن
+۱) چشم‌انداز کلی (۲-۳ جمله):
+- فقط وضعیت فعلی بازار و دلیل اصلی حرکت امروز
 
-۲) تحلیل جریان پول هوشمند و واگرایی (یک پاراگراف مهم):
-- مقایسه کن آیا جهت امروزِ EUR/USD با شاخص دلار (DXY) هم‌خوانی دارد یا یک فیک‌اوت (واگرایی) است؟ (قانون ۱۲ را به دقت اعمال کن)
-- بررسی کن آیا اخبار امروز با توجه به واکنش اوراق قرضه (US10Y) پیش‌خور شده‌اند؟
-- آیا انحراف داده‌ها صفر بوده و تله نقدینگی ایجاد شده است؟
+۲) تحلیل جریان پول هوشمند و واگرایی (۳-۴ جمله، این بخش بسیار مهم است):
+- با استفاده از اعداد واقعی DXY و US10Y بررسی کن:
+  الف) آیا جهت EUR/USD با DXY هم‌خوان است؟ (قانون ۱۲)
+  ب) آیا واکنش US10Y نشان‌دهنده پیش‌خور شدن خبر است؟ (قانون ۱۱)
+  ج) نتیجه‌گیری: آیا روند سالم است یا تله نقدینگی وجود دارد؟
 
-۳) عوامل مؤثر و رویدادها (یک پاراگراف):
-- هر عامل اقتصادی و دلیل منطقی آن را توضیح بده
+۳) عوامل مؤثر (۲-۳ جمله):
+- فقط عواملی که در بخش ۱ و ۲ نگفتی. مثلاً: نفت، ژئوپلیتیک، داده‌های منتظره
 
-۴) چشم‌انداز کوتاه‌مدت (یک پاراگراف):
-- بازار امروز به چه چیزی چشم دوخته است؟
+۴) چشم‌انداز کوتاه‌مدت (۱-۲ جمله):
+- بازار امروز دقیقاً منتظر چه رویداد یا داده‌ای است؟
 
-۵) توصیه نهایی (یک خط):
-- اقدام عملی معامله‌گر با توجه به تله‌ها و واگرایی‌ها
+۵) توصیه نهایی (فقط یک جمله کوتاه و قاطع):
+- اقدام عملی معامله‌گر. باید با جهت تعیین‌شده هم‌خوان باشد
 
 اخبار:
 {news_text[:2500]}
@@ -1257,13 +1382,21 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
 جهت تعیین‌شده: {direction} | اطمینان: {confidence}
 {perf_note}
 
-مهم: تحلیل باید عمیق، منطقی و حرفه‌ای باشد. علت و معلول اقتصادی را دقیق بگو."""
+مهم: تحلیل باید عمیق، منطقی و بدون تکرار باشد. هر بخش نکته جدیدی بگوید."""
 
         messages = [
-            {"role": "system", "content": "تو تحلیل‌گر فاندامنتال حرفه‌ای فارکس هستی. فقط فارسی. تحلیل‌هایت عمیق و دقیق هستند. هیچ کلمه انگلیسی، چینی یا زبان دیگر استفاده نکن."},
+            {"role": "system", "content": (
+                "تو تحلیل‌گر فاندامنتال حرفه‌ای فارکس هستی. فقط فارسی بنویس. "
+                "هیچ کلمه انگلیسی، چینی یا زبان دیگر استفاده نکن. "
+                "قوانین مطلق: "
+                "۱) هر نکته را فقط یک بار بگو - تکرار ممنوع. "
+                "۲) اگر در بخش قبلی چیزی گفتی، در بخش بعدی تکرارش نکن. "
+                "۳) تحلیل باید سازگار باشد - اگر جهت صعودی است، هیچ جمله نزولی ننویس. "
+                "۴) لحن باید با سطح اطمینان هم‌خوان باشد."
+            )},
             {"role": "user", "content": prompt},
         ]
-        result = call_groq(messages, temperature=0.2, max_tokens=800)
+        result = call_groq(messages, temperature=0.15, max_tokens=900)
         if result:
             cleaned = clean_foreign_chars(result)
             cleaned = re.sub(r'(?i)\bcause\b', 'باعث', cleaned)
@@ -1538,7 +1671,8 @@ def build_weekly_report():
     news = fetch_all_news()
     week_events = get_week_events()
     market_assets = get_market_assets()
-    bull, bear, reason = score_sentiment_ai("\n".join(news))
+    cal = get_today_events()
+    bull, bear, reason = score_sentiment_ai("\n".join(news), calendar_events=cal)
     direction, confidence = get_direction(bull, bear)
     performance = verify_predictions()
 
@@ -1639,12 +1773,11 @@ def run_once(slot="manual"):
             news = fetch_all_news()
             full_news = all_new_text + "\n" + "\n".join(news)
 
-            bull, bear, reason = score_sentiment_ai(full_news)
+            cal = get_today_events()
+            bull, bear, reason = score_sentiment_ai(full_news, calendar_events=cal)
             direction, confidence = get_direction(bull, bear)
 
             view_changed, prev_dir, prev_reason = check_view_change(direction, reason)
-
-            cal = get_today_events()
             perf_summary = verify_predictions()
             market_assets = get_market_assets()
 
@@ -1680,7 +1813,7 @@ def run_once(slot="manual"):
 
     news = fetch_all_news()
     cal = get_today_events()
-    bull, bear, reason = score_sentiment_ai("\n".join(news))
+    bull, bear, reason = score_sentiment_ai("\n".join(news), calendar_events=cal)
     direction, confidence = get_direction(bull, bear)
     market_assets = get_market_assets()
 
