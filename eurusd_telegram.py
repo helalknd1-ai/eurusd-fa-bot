@@ -43,7 +43,8 @@ except Exception as e:
 # ---------- تنظیمات ----------
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "PUT_YOURS")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "PUT_YOURS")
-SEND_VOICE = os.getenv("SEND_VOICE", "true").lower() == "true"
+# صوت غیرفعال شده
+SEND_VOICE = False
 
 VOICE_NAME = os.getenv("VOICE_NAME", "fa-IR-DilaraNeural")
 VOICE_RATE = os.getenv("VOICE_RATE", "-12%")
@@ -680,8 +681,27 @@ def should_wait_for_more_news():
         return False, None
 
 # ==================================================================
-# بخش ۷: یادگیری از خطا
+# بخش ۷: سیستم عملکرد دو سشنی (لندن + آمریکا)
 # ==================================================================
+# سشن لندن:  ثبت ۱۰:۱۰ (morning) → ارزیابی ۱۶:۰۰ (قبل آمریکا)
+# سشن آمریکا: ثبت ۱۶:۰۰ (us_preopen) → ارزیابی ۲۱:۳۰ (پایان روز)
+# ترکیبی:    لندن + آمریکا هم‌جهت بودند؟
+
+SESSION_CONFIG = {
+    "morning": {
+        "label": "لندن",
+        "emoji": "🇬🇧",
+        "eval_hour": 16,
+        "eval_minute": 0,
+    },
+    "us_preopen": {
+        "label": "آمریکا",
+        "emoji": "🇺🇸",
+        "eval_hour": 21,
+        "eval_minute": 30,
+    },
+}
+
 def save_prediction(direction, confidence, slot, has_news=False):
     price = get_eurusd_price()
     if not price:
@@ -697,11 +717,13 @@ def save_prediction(direction, confidence, slot, has_news=False):
         print(f"⚠️ پیش‌بینی امروز برای {slot} قبلاً ثبت شده ({existing_today[0]}) — رد شد")
         return
     
+    session = SESSION_CONFIG.get(slot, {})
     pid = f"{now.strftime('%Y%m%d_%H%M')}_{slot}"
     predictions[pid] = {
         "timestamp": now.isoformat(),
         "date": now.strftime("%Y-%m-%d"),
         "slot": slot,
+        "session": session.get("label", slot),
         "direction": direction,
         "confidence": confidence,
         "price_at_prediction": price,
@@ -710,16 +732,39 @@ def save_prediction(direction, confidence, slot, has_news=False):
         "result": None,
         "price_change_pips": None,
     }
-    if len(predictions) > 100:
-        for k in sorted(predictions.keys())[:len(predictions) - 100]:
+    if len(predictions) > 200:
+        for k in sorted(predictions.keys())[:len(predictions) - 200]:
             del predictions[k]
     save_json(PREDICTIONS_FILE, predictions)
-    print(f"پیش‌بینی ذخیره شد: {pid} - {direction}")
+    print(f"پیش‌بینی ذخیره شد: {pid} - {direction} (سشن: {session.get('label', slot)})")
+
+def get_eurusd_close_price(target_date_str):
+    """دریافت قیمت بسته شدن یک روز مشخص از Yahoo Finance"""
+    try:
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/EURUSD=X"
+        params = {"range": "5d", "interval": "1d"}
+        r = requests.get(url, params=params, headers=HEADERS, timeout=10)
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        result = data.get("chart", {}).get("result", [])
+        if not result:
+            return None
+        timestamps = result[0].get("timestamp", [])
+        closes = result[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+        for ts, close in zip(timestamps, closes):
+            dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+            if dt.strftime("%Y-%m-%d") == target_date_str and close:
+                return round(close, 5)
+    except Exception as ex:
+        print(f"خطا در دریافت قیمت بسته شدن {target_date_str}:", ex)
+    return None
 
 def verify_predictions():
     predictions = load_json(PREDICTIONS_FILE, {})
     if not predictions:
-        return {"total": 0, "decisive": 0, "correct": 0, "wrong": 0, "neutral": 0, "accuracy": 0}
+        return {"total": 0, "decisive": 0, "correct": 0, "wrong": 0, "neutral": 0, 
+                "accuracy": 0, "unverified": 0}
 
     current = get_eurusd_price()
     if not current:
@@ -729,9 +774,8 @@ def verify_predictions():
     # آستانه پویا بر اساس ATR واقعی
     atr = get_eurusd_atr(14)
     if atr and atr > 0:
-        # آستانه = 30% از ATR روزانه (پویا)
         threshold = round(atr * 0.3, 1)
-        threshold = max(10.0, min(threshold, 35.0))  # حداقل 10، حداکثر 35
+        threshold = max(10.0, min(threshold, 35.0))
         print(f"📏 آستانه پویا: {threshold} پیپ (ATR14={atr})")
     else:
         threshold = 20.0
@@ -744,24 +788,38 @@ def verify_predictions():
             continue
         try:
             ptime = datetime.fromisoformat(pred["timestamp"])
+            slot = pred.get("slot", "morning")
             
-            # --- منطق جدید ارزیابی درون‌روزی (Intraday) ---
-            # تنظیم زمان هدف برای بررسی (ساعت ۲۱:۳۰ همان روز به وقت تهران)
-            target_time = ptime.replace(hour=21, minute=30, second=0, microsecond=0)
+            # زمان ارزیابی بر اساس سشن
+            session = SESSION_CONFIG.get(slot, {})
+            eval_hour = session.get("eval_hour", 21)
+            eval_minute = session.get("eval_minute", 30)
             
-            # اگر پیش‌بینی خودش بعد از ساعت ۲۱:۳۰ شب صادر شده باشد، بررسی آن می‌افتد برای ۲۱:۳۰ فردا
+            target_time = ptime.replace(hour=eval_hour, minute=eval_minute, second=0, microsecond=0)
+            
+            # اگر پیش‌بینی بعد از زمان ارزیابی صادر شده
             if ptime >= target_time:
                 target_time += timedelta(days=1)
             
-            # اگر هنوز به ساعت ۲۱:۳۰ نرسیده‌ایم، از این پیش‌بینی رد شو و بعدا بررسی کن
+            # هنوز وقت ارزیابی نرسیده
             if now < target_time:
                 continue
-            # ----------------------------------------------
             
             old = pred.get("price_at_prediction", 0)
             if not old:
                 continue
-            change = round((current - old) * 10000, 1)
+            
+            # قیمت ارزیابی: برای لندن = قیمت لحظه‌ای ساعت ۱۶، برای آمریکا = قیمت بسته شدن
+            if slot == "us_preopen":
+                pred_date = ptime.strftime("%Y-%m-%d")
+                close_price = get_eurusd_close_price(pred_date)
+                check_price = close_price if close_price else current
+                price_source = "close" if close_price else "current"
+            else:
+                check_price = current
+                price_source = "current"
+            
+            change = round((check_price - old) * 10000, 1)
             d = pred.get("direction", "خنثی")
 
             if abs(change) < threshold:
@@ -778,11 +836,13 @@ def verify_predictions():
             pred["verified"] = True
             pred["result"] = result
             pred["price_change_pips"] = change
-            pred["price_at_check"] = current
+            pred["price_at_check"] = check_price
+            pred["price_source"] = price_source
             pred["threshold_used"] = threshold
             changed = True
-        except Exception:
-            pass
+            print(f"📊 ارزیابی {pid}: {d} → {result} | تغییر={change} پیپ | سشن={session.get('label', slot)}")
+        except Exception as ex:
+            print(f"خطا در ارزیابی {pid}:", ex)
 
     if changed:
         save_json(PREDICTIONS_FILE, predictions)
@@ -791,60 +851,153 @@ def verify_predictions():
 def calculate_perf_from_json(predictions=None):
     if predictions is None:
         predictions = load_json(PREDICTIONS_FILE, {})
-    verified = [p for p in predictions.values() if p.get("verified")]
+    all_preds = list(predictions.values())
+    verified = [p for p in all_preds if p.get("verified")]
+    unverified = len(all_preds) - len(verified)
     total = len(verified)
     
     if total == 0:
-        return {"total": 0, "decisive": 0, "correct": 0, "wrong": 0, "neutral": 0, "accuracy": 0}
-        
+        return {"total": 0, "decisive": 0, "correct": 0, "wrong": 0, "neutral": 0, 
+                "accuracy": 0, "unverified": unverified,
+                "london": _empty_session_perf(), "us": _empty_session_perf(), "combined": _empty_combined()}
+    
     correct = sum(1 for p in verified if p["result"] == "correct")
     wrong = sum(1 for p in verified if p["result"] == "wrong")
     neutral = sum(1 for p in verified if p["result"] == "neutral")
-    
     decisive = correct + wrong
     accuracy = round(correct / decisive * 100, 1) if decisive > 0 else 0
     
+    # عملکرد به تفکیک سشن
+    london_perf = _calc_session_perf(verified, "morning")
+    us_perf = _calc_session_perf(verified, "us_preopen")
+    combined = _calc_combined_perf(predictions)
+    
     return {
-        "total": total, 
-        "decisive": decisive, 
-        "correct": correct,
-        "wrong": wrong, 
-        "neutral": neutral, 
-        "accuracy": accuracy,
+        "total": total, "decisive": decisive, "correct": correct,
+        "wrong": wrong, "neutral": neutral, "accuracy": accuracy,
+        "unverified": unverified,
+        "london": london_perf, "us": us_perf, "combined": combined,
+    }
+
+def _empty_session_perf():
+    return {"total": 0, "decisive": 0, "correct": 0, "wrong": 0, "neutral": 0, "accuracy": 0}
+
+def _empty_combined():
+    return {"days": 0, "same_direction": 0, "diff_direction": 0, "same_pct": 0}
+
+def _calc_session_perf(verified, slot):
+    preds = [p for p in verified if p.get("slot") == slot]
+    total = len(preds)
+    if total == 0:
+        return _empty_session_perf()
+    correct = sum(1 for p in preds if p["result"] == "correct")
+    wrong = sum(1 for p in preds if p["result"] == "wrong")
+    neutral = sum(1 for p in preds if p["result"] == "neutral")
+    decisive = correct + wrong
+    accuracy = round(correct / decisive * 100, 1) if decisive > 0 else 0
+    return {"total": total, "decisive": decisive, "correct": correct, 
+            "wrong": wrong, "neutral": neutral, "accuracy": accuracy}
+
+def _calc_combined_perf(predictions):
+    """محاسبه هم‌جهتی لندن و آمریکا در هر روز"""
+    all_preds = list(predictions.values())
+    verified = [p for p in all_preds if p.get("verified")]
+    
+    # گروه‌بندی بر اساس تاریخ
+    by_date = {}
+    for p in verified:
+        d = p.get("date", "")
+        if d not in by_date:
+            by_date[d] = {}
+        slot = p.get("slot", "")
+        by_date[d][slot] = p.get("direction", "خنثی")
+    
+    days = 0
+    same_direction = 0
+    diff_direction = 0
+    
+    for date, slots in by_date.items():
+        london_dir = slots.get("morning")
+        us_dir = slots.get("us_preopen")
+        if not london_dir or not us_dir:
+            continue
+        # فقط روزهایی که هر دو سشن جهت قطعی (غیرخنثی) داشتند
+        if london_dir == "خنثی" or us_dir == "خنثی":
+            continue
+        days += 1
+        if london_dir == us_dir:
+            same_direction += 1
+        else:
+            diff_direction += 1
+    
+    same_pct = round(same_direction / days * 100, 1) if days > 0 else 0
+    return {
+        "days": days,
+        "same_direction": same_direction,
+        "diff_direction": diff_direction,
+        "same_pct": same_pct,
     }
 
 def build_performance_view(perf):
-    if not perf or perf.get("total", 0) < 1:
+    if not perf:
         return "🎯 عملکرد ربات:\nهنوز داده کافی نیست."
-        
+    
+    total = perf.get("total", 0)
+    unverified = perf.get("unverified", 0)
+    
+    if total < 1 and unverified < 1:
+        return "🎯 عملکرد ربات:\nهنوز داده کافی نیست."
+    
     acc = perf.get("accuracy", 0)
     correct = perf.get("correct", 0)
     wrong = perf.get("wrong", 0)
     neutral = perf.get("neutral", 0)
-    decisive = perf.get("decisive", correct + wrong)
-    total = perf.get("total", 0)
+    decisive = perf.get("decisive", 0)
+    london = perf.get("london", _empty_session_perf())
+    us = perf.get("us", _empty_session_perf())
+    combined = perf.get("combined", _empty_combined())
     
-    if decisive == 0:
-        return (f"🎯 عملکرد ربات ({to_fa_digits(str(total))} پیش‌بینی):\n"
-                f"⏳ هنوز پیش‌بینی قطعی نداریم — بازار کمتر از ۲۰ پیپ حرکت کرده.\n"
-                f"⚪ خنثی: {to_fa_digits(str(neutral))}")
-                
-    if acc >= 70:
-        rating = "🟢 عالی"
-    elif acc >= 55:
-        rating = "🟡 خوب"
-    elif acc >= 45:
-        rating = "🟠 متوسط"
-    else:
-        rating = "🔴 در حال یادگیری"
+    parts = []
+    
+    # --- عملکرد کلی ---
+    if decisive > 0:
+        if acc >= 70: rating = "🟢 عالی"
+        elif acc >= 55: rating = "🟡 خوب"
+        elif acc >= 45: rating = "🟠 متوسط"
+        else: rating = "🔴 در حال یادگیری"
         
-    return (
-        f"🎯 عملکرد ربات ({to_fa_digits(str(total))} پیش‌بینی):\n"
-        f"{rating} دقت: {to_fa_digits(str(acc))}٪ (مبتنی بر {to_fa_digits(str(decisive))} سیگنال قطعی)\n"
-        f"✅ درست: {to_fa_digits(str(correct))} | "
-        f"❌ اشتباه: {to_fa_digits(str(wrong))} | "
-        f"⚪ خنثی: {to_fa_digits(str(neutral))}"
-    )
+        parts.append(f"🎯 عملکرد کلی ({to_fa_digits(str(total + unverified))} پیش‌بینی):")
+        parts.append(f"{rating} دقت: {to_fa_digits(str(acc))}٪ ({to_fa_digits(str(decisive))} قطعی)")
+        parts.append(f"✅ {to_fa_digits(str(correct))} | ❌ {to_fa_digits(str(wrong))} | ⚪ {to_fa_digits(str(neutral))}")
+    else:
+        parts.append(f"🎯 عملکرد ربات ({to_fa_digits(str(total + unverified))} پیش‌بینی):")
+        if unverified > 0:
+            parts.append(f"⏳ در انتظار ارزیابی: {to_fa_digits(str(unverified))}")
+        if neutral > 0:
+            parts.append(f"⚪ خنثی: {to_fa_digits(str(neutral))}")
+    
+    # --- عملکرد لندن ---
+    if london.get("total", 0) > 0:
+        l_acc = london["accuracy"]
+        l_dec = london["decisive"]
+        if l_dec > 0:
+            parts.append(f"🇬🇧 لندن: {to_fa_digits(str(l_acc))}٪ دقت | ✅{to_fa_digits(str(london['correct']))} ❌{to_fa_digits(str(london['wrong']))} ⚪{to_fa_digits(str(london['neutral']))}")
+    
+    # --- عملکرد آمریکا ---
+    if us.get("total", 0) > 0:
+        u_acc = us["accuracy"]
+        u_dec = us["decisive"]
+        if u_dec > 0:
+            parts.append(f"🇺🇸 آمریکا: {to_fa_digits(str(u_acc))}٪ دقت | ✅{to_fa_digits(str(us['correct']))} ❌{to_fa_digits(str(us['wrong']))} ⚪{to_fa_digits(str(us['neutral']))}")
+    
+    # --- هم‌جهتی لندن + آمریکا ---
+    if combined.get("days", 0) >= 2:
+        parts.append(f"🔄 هم‌جهتی: {to_fa_digits(str(combined['same_pct']))}٪ از {to_fa_digits(str(combined['days']))} روز لندن و آمریکا هم‌جهت بودند")
+    
+    if unverified > 0 and decisive > 0:
+        parts.append(f"⏳ در انتظار: {to_fa_digits(str(unverified))}")
+    
+    return "\n".join(parts)
 # ==================================================================
 # بخش ۸: تقویم اقتصادی
 # ==================================================================
@@ -1876,7 +2029,7 @@ def run_once(slot="manual"):
     send_text(msg)
 
     save_view(direction, confidence, reason)
-    if slot == "morning":
+    if slot in ("morning", "us_preopen"):
         has_news = bool(cal)
         save_prediction(direction, confidence, slot, has_news=has_news)
 
