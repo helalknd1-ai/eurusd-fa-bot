@@ -1592,6 +1592,16 @@ def ai_analyze_fa(news_text, calendar_events, bull, bear, direction, confidence,
         if result:
             cleaned = clean_foreign_chars(result)
             cleaned = re.sub(r'(?i)\bcause\b', 'باعث', cleaned)
+            # اصلاح خطاهای رایج AI
+            typo_fixes = {
+                "هامور": "هرمز",
+                "هرمانز": "هرمز",
+                "خلیج هرمز": "تنگه هرمز",
+                "m c": "حد",
+                "сторону": "موافق",
+            }
+            for wrong, right in typo_fixes.items():
+                cleaned = cleaned.replace(wrong, right)
             return cleaned
         return None
     except Exception as ex:
