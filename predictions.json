@@ -1,1 +1,15 @@
-{}
+{
+  "20260821_1600_us_preopen": {
+    "timestamp": "2026-08-21T16:00:48.106836+03:30",
+    "date": "2026-08-21",
+    "slot": "us_preopen",
+    "session": "آمریکا",
+    "direction": "صعودی",
+    "confidence": "متوسط",
+    "price_at_prediction": 1.1699,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
+  }
+}
