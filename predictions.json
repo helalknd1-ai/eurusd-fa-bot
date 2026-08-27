@@ -88,6 +88,22 @@
     "confidence": "پایین",
     "price_at_prediction": 1.1658,
     "has_news": true,
+    "verified": true,
+    "result": "neutral",
+    "price_change_pips": -10.0,
+    "price_at_check": 1.1648,
+    "price_source": "current",
+    "threshold_used": 14.9
+  },
+  "20260827_1600_us_preopen": {
+    "timestamp": "2026-08-27T16:00:53.200155+03:30",
+    "date": "2026-08-27",
+    "slot": "us_preopen",
+    "session": "آمریکا",
+    "direction": "نزولی",
+    "confidence": "متوسط",
+    "price_at_prediction": 1.1648,
+    "has_news": true,
     "verified": false,
     "result": null,
     "price_change_pips": null
