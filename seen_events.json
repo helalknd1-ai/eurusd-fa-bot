@@ -14,5 +14,17 @@
   "hl_5e8311aad57b3ee7fcf932f34a2fc01b": {
     "date": "2026-09-16",
     "title": "Atlanta Fed GDPNow estimate for Q3 growth jumps to 5.1% from 4.4%"
+  },
+  "pre_Federal Funds Rate_2026-09-16T14:00:00-04:00": {
+    "date": "2026-09-16",
+    "sent_at": "21:00"
+  },
+  "pre_FOMC Economic Projections_2026-09-16T14:00:00-04:00": {
+    "date": "2026-09-16",
+    "sent_at": "21:00"
+  },
+  "pre_FOMC Statement_2026-09-16T14:00:00-04:00": {
+    "date": "2026-09-16",
+    "sent_at": "21:00"
   }
 }
