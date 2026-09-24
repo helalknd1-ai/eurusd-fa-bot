@@ -456,8 +456,11 @@
     "confidence": "متوسط",
     "price_at_prediction": 1.1391,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "correct",
+    "price_change_pips": -20.0,
+    "price_at_check": 1.1371,
+    "price_source": "current",
+    "threshold_used": 15.8
   }
 }
