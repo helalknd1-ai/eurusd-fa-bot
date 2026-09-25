@@ -462,5 +462,18 @@
     "price_at_check": 1.1371,
     "price_source": "current",
     "threshold_used": 15.8
+  },
+  "20260925_1010_morning": {
+    "timestamp": "2026-09-25T10:10:46.302948+03:30",
+    "date": "2026-09-25",
+    "slot": "morning",
+    "session": "لندن",
+    "direction": "نزولی",
+    "confidence": "بالا",
+    "price_at_prediction": 1.1387,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
   }
 }
