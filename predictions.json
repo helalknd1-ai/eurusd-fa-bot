@@ -472,6 +472,22 @@
     "confidence": "بالا",
     "price_at_prediction": 1.1387,
     "has_news": true,
+    "verified": true,
+    "result": "wrong",
+    "price_change_pips": 22.0,
+    "price_at_check": 1.1409,
+    "price_source": "current",
+    "threshold_used": 16.1
+  },
+  "20260925_1600_us_preopen": {
+    "timestamp": "2026-09-25T16:00:48.052543+03:30",
+    "date": "2026-09-25",
+    "slot": "us_preopen",
+    "session": "آمریکا",
+    "direction": "خنثی",
+    "confidence": "پایین",
+    "price_at_prediction": 1.1409,
+    "has_news": true,
     "verified": false,
     "result": null,
     "price_change_pips": null
