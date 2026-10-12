@@ -664,8 +664,11 @@
     "confidence": "پایین",
     "price_at_prediction": 1.121,
     "has_news": false,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "wrong",
+    "price_change_pips": -29.0,
+    "price_at_check": 1.1181,
+    "price_source": "current",
+    "threshold_used": 21.5
   }
 }
