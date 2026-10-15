@@ -22,5 +22,21 @@
   "hl_f5faa72969e21a651ac434cc97830d2f": {
     "date": "2026-10-15",
     "title": "Gold whipsaws after US CPI as data falls short of bringing an October rate hike back into play"
+  },
+  "pre_Core PPI m/m_2026-10-15T08:30:00-04:00": {
+    "date": "2026-10-15",
+    "sent_at": "15:31"
+  },
+  "pre_Core Retail Sales m/m_2026-10-15T08:30:00-04:00": {
+    "date": "2026-10-15",
+    "sent_at": "15:31"
+  },
+  "pre_PPI m/m_2026-10-15T08:30:00-04:00": {
+    "date": "2026-10-15",
+    "sent_at": "15:31"
+  },
+  "pre_Retail Sales m/m_2026-10-15T08:30:00-04:00": {
+    "date": "2026-10-15",
+    "sent_at": "15:31"
   }
 }
