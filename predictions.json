@@ -920,8 +920,11 @@
     "confidence": "متوسط",
     "price_at_prediction": 1.1187,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "neutral",
+    "price_change_pips": 5.0,
+    "price_at_check": 1.1192,
+    "price_source": "current",
+    "threshold_used": 18.0
   }
 }
