@@ -968,6 +968,22 @@
     "confidence": "پایین",
     "price_at_prediction": 1.1196,
     "has_news": true,
+    "verified": true,
+    "result": "neutral",
+    "price_change_pips": -13.0,
+    "price_at_check": 1.1183,
+    "price_source": "current",
+    "threshold_used": 17.9
+  },
+  "20261103_1600_us_preopen": {
+    "timestamp": "2026-11-03T16:00:48.822156+03:30",
+    "date": "2026-11-03",
+    "slot": "us_preopen",
+    "session": "آمریکا",
+    "direction": "خنثی",
+    "confidence": "پایین",
+    "price_at_prediction": 1.1183,
+    "has_news": true,
     "verified": false,
     "result": null,
     "price_change_pips": null
