@@ -1038,5 +1038,18 @@
     "price_at_check": 1.1176,
     "price_source": "current",
     "threshold_used": 18.7
+  },
+  "20261109_1010_morning": {
+    "timestamp": "2026-11-09T10:10:40.180496+03:30",
+    "date": "2026-11-09",
+    "slot": "morning",
+    "session": "لندن",
+    "direction": "خنثی",
+    "confidence": "پایین",
+    "price_at_prediction": 1.1168,
+    "has_news": true,
+    "verified": false,
+    "result": null,
+    "price_change_pips": null
   }
 }
