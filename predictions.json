@@ -1112,8 +1112,11 @@
     "confidence": "بالا",
     "price_at_prediction": 1.1064,
     "has_news": true,
-    "verified": false,
-    "result": null,
-    "price_change_pips": null
+    "verified": true,
+    "result": "neutral",
+    "price_change_pips": -9.0,
+    "price_at_check": 1.1055,
+    "price_source": "current",
+    "threshold_used": 24.6
   }
 }
